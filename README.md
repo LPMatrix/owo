@@ -69,7 +69,7 @@ Every call returns an `OwoResult`:
 ```python
 @dataclass
 class OwoResult:
-    intent: str                    # transfer | bill_pay | buy_airtime | buy_data | crypto_sell | balance_check | unknown
+    intent: str                    # transfer | bill_pay | buy_airtime | buy_data | crypto_sell | balance_check | unknown | unknown
     amount: float | None
     currency: str                  # always "NGN" for now
     recipient: str | None
@@ -86,34 +86,40 @@ class OwoResult:
 
 ## Configuration
 
-By default, `parse()` runs a **small offline heuristic** for a handful of common
-English patterns so you can develop and run tests without API keys. Inputs that
-do not match any rule return `intent: "unknown"` with `needs_llm_provider` in
-`flags` so you can route them to a model. For full multilingual coverage, pass a
-**provider** that implements `BaseProvider` from `owo` (for example Anthropic
-or OpenAI behind your own wrapper).
+By default, `parse()` runs an **offline heuristic** covering common transfer and
+balance patterns across all five supported languages (English, Pidgin, Yoruba,
+Hausa, and Igbo). No API key needed. Inputs that fall outside the heuristic's
+rule set return `intent: "unknown"` with `needs_llm_provider` in `flags` — pass
+a provider to handle those cases.
 
-Swap in a provider via the abstraction:
+```python
+# Offline — works for common patterns in all five languages
+parse("Abeg send 5k to Chidi, GTBank")
+parse("Aika dubu goma zuwa ga Ahmad")
+parse("Send half a milli to Kemi")
+```
+
+To handle complex or ambiguous inputs, plug in an LLM provider. An Anthropic
+provider ships with the package:
 
 ```python
 from owo import parse
-from owo.providers import OpenAIProvider
+from owo.providers.anthropic import AnthropicProvider
 
 result = parse(
-    "Send 20k to Mama",
-    provider=OpenAIProvider(model="gpt-4o")
+    "Jẹ kí n san ₦5,000 fún DSTV mi",
+    provider=AnthropicProvider(),  # reads ANTHROPIC_API_KEY from env
 )
 ```
 
-Or bring your own:
+Or bring your own by subclassing `BaseProvider`:
 
 ```python
-from owo.providers import BaseProvider
+from owo import BaseProvider
 
 class MyProvider(BaseProvider):
     def complete(self, prompt: str) -> str:
-        # call whatever you want here
-        ...
+        ...  # call any model here
 ```
 
 ---

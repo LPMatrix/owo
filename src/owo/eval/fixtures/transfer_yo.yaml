@@ -1,0 +1,32 @@
+- id: transfer_yo_001
+  input: "Ran 20k si Mama"
+  expected:
+    intent: transfer
+    amount: 20000
+    currency: NGN
+    recipient: Mama
+    language_detected: yo
+    flags: []
+  notes: "ran ... si is the Yoruba send-to verb frame."
+
+- id: transfer_yo_002
+  input: "Fi ₦5000 ranṣẹ si Tunde"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Tunde
+    language_detected: yo
+    flags: []
+  notes: "fi ... ranṣẹ si = put ... send to. ṣ and ẹ are strong Yoruba signals."
+
+- id: transfer_yo_003
+  input: "Ran 10k si Ade"
+  expected:
+    intent: transfer
+    amount: 10000
+    currency: NGN
+    recipient: Ade
+    language_detected: yo
+    flags: []
+  notes: "k notation in Yoruba frame."

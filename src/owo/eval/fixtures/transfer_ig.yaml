@@ -1,0 +1,32 @@
+- id: transfer_ig_001
+  input: "Zipụ ego 5k nye Emeka"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Emeka
+    language_detected: ig
+    flags: []
+  notes: "zipụ ego ... nye is the Igbo send-money-to frame."
+
+- id: transfer_ig_002
+  input: "Ziga ego 10000 nye Ada"
+  expected:
+    intent: transfer
+    amount: 10000
+    currency: NGN
+    recipient: Ada
+    language_detected: ig
+    flags: []
+  notes: "ziga is a synonym for zipụ."
+
+- id: transfer_ig_003
+  input: "Zipu ego 2k nye Chukwu"
+  expected:
+    intent: transfer
+    amount: 2000
+    currency: NGN
+    recipient: Chukwu
+    language_detected: ig
+    flags: []
+  notes: "zipu without the dot (common ASCII fallback for zipụ)."

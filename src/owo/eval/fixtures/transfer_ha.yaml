@@ -1,0 +1,32 @@
+- id: transfer_ha_001
+  input: "Aika dubu goma zuwa ga Ahmad"
+  expected:
+    intent: transfer
+    amount: 10000
+    currency: NGN
+    recipient: Ahmad
+    language_detected: ha
+    flags: []
+  notes: "dubu goma = 10 × 1000. aika/zuwa ga are unambiguous Hausa markers."
+
+- id: transfer_ha_002
+  input: "Aika dubu biyar zuwa ga Musa"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Musa
+    language_detected: ha
+    flags: []
+  notes: "dubu biyar = 5 × 1000."
+
+- id: transfer_ha_003
+  input: "Mika 10k zuwa ga Fatima"
+  expected:
+    intent: transfer
+    amount: 10000
+    currency: NGN
+    recipient: Fatima
+    language_detected: ha
+    flags: []
+  notes: "mika synonym for aika; k notation."

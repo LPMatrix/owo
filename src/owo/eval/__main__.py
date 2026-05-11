@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib
+import os
+from argparse import ArgumentParser
 from collections import defaultdict
 from dataclasses import dataclass
 from importlib import resources
@@ -8,6 +11,7 @@ from typing import Any
 import yaml
 
 from owo import parse
+from owo.providers import BaseProvider
 from owo.schema import OwoResult
 
 _TRACKED_FIELDS = [
@@ -84,7 +88,26 @@ def _compare(expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
     return mismatches
 
 
-def _run_fixture(fx: dict[str, Any]) -> _FixtureResult | None:
+def _load_provider(spec: str) -> BaseProvider:
+    """Instantiate a provider from a 'module:ClassName' spec string."""
+    try:
+        module_name, cls_name = spec.rsplit(":", 1)
+    except ValueError:
+        raise SystemExit(f"--provider must be 'module:ClassName', got: {spec!r}")
+    try:
+        mod = importlib.import_module(module_name)
+    except ImportError as exc:
+        raise SystemExit(f"Cannot import provider module {module_name!r}: {exc}") from exc
+    try:
+        cls = getattr(mod, cls_name)
+    except AttributeError:
+        raise SystemExit(f"Class {cls_name!r} not found in {module_name!r}")
+    return cls()
+
+
+def _run_fixture(
+    fx: dict[str, Any], provider: BaseProvider | None
+) -> _FixtureResult | None:
     fx_id = fx.get("id", "<no id>")
     inp = fx.get("input")
     if not isinstance(inp, str):
@@ -95,7 +118,26 @@ def _run_fixture(fx: dict[str, Any]) -> _FixtureResult | None:
         print(f"[skip] {fx_id}: missing mapping 'expected'")
         return None
 
-    result = parse(inp)
+    # Skip provider-required fixtures when running offline
+    requires_provider = fx.get("requires_provider", False)
+    if requires_provider and provider is None:
+        print(f"[skip] {fx_id}: requires provider (pass --provider or OWO_PROVIDER)")
+        return None
+
+    try:
+        result = parse(inp, provider=provider)
+    except Exception as exc:
+        print(f"ERROR {fx_id}: {exc}")
+        return _FixtureResult(
+            fx_id=fx_id,
+            passed=False,
+            mismatches=[f"parse() raised: {exc}"],
+            intent="error",
+            language="error",
+            expected=expected,
+            actual={},
+        )
+
     actual = _as_dict(result)
     mismatches = _compare(expected, actual)
     return _FixtureResult(
@@ -158,7 +200,27 @@ def _print_summary(results: list[_FixtureResult]) -> None:
             print(f"  {f:<22} {hits:>3}/{tot:<3}  {bar}  {pct:>3}%")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = ArgumentParser(
+        prog="python -m owo.eval",
+        description="Run owo offline eval suite.",
+    )
+    parser.add_argument(
+        "--provider",
+        metavar="MODULE:CLASS",
+        default=os.environ.get("OWO_PROVIDER"),
+        help=(
+            "Provider class for non-offline fixtures, e.g. "
+            "owo.providers.anthropic:AnthropicProvider. "
+            "Also reads OWO_PROVIDER env var."
+        ),
+    )
+    args = parser.parse_args(argv)
+
+    provider: BaseProvider | None = None
+    if args.provider:
+        provider = _load_provider(args.provider)
+
     fixtures = _load_fixtures()
     if not fixtures:
         print("No YAML fixtures found under owo.eval.fixtures.")
@@ -166,7 +228,7 @@ def main() -> int:
 
     results: list[_FixtureResult] = []
     for fx in fixtures:
-        r = _run_fixture(fx)
+        r = _run_fixture(fx, provider)
         if r is None:
             continue
         results.append(r)

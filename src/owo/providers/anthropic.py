@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+import os
+
+try:
+    import anthropic as _anthropic
+except ImportError as exc:
+    raise ImportError(
+        "Install the Anthropic SDK: pip install 'owo-parse[anthropic]'"
+    ) from exc
+
+from owo.providers import BaseProvider
+
+_DEFAULT_MODEL = "claude-sonnet-4-6"
+
+
+class AnthropicProvider(BaseProvider):
+    """BaseProvider backed by the Anthropic Messages API.
+
+    Model and API key are read from environment variables when not passed
+    explicitly:
+
+    - ``OWO_ANTHROPIC_MODEL``  — default: ``claude-sonnet-4-6``
+    - ``ANTHROPIC_API_KEY``    — required (read by the SDK automatically)
+
+    Usage::
+
+        from owo import parse
+        from owo.providers.anthropic import AnthropicProvider
+
+        result = parse("Jẹ kí n san ₦5,000 fún DSTV mi", provider=AnthropicProvider())
+    """
+
+    def __init__(
+        self,
+        model: str | None = None,
+        *,
+        api_key: str | None = None,
+        max_tokens: int = 512,
+    ) -> None:
+        self._client = _anthropic.Anthropic(api_key=api_key)
+        self._model = model or os.environ.get("OWO_ANTHROPIC_MODEL", _DEFAULT_MODEL)
+        self._max_tokens = max_tokens
+
+    def complete(self, prompt: str) -> str:
+        response = self._client.messages.create(
+            model=self._model,
+            max_tokens=self._max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text

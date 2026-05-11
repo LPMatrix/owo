@@ -7,17 +7,24 @@ __pycache__/
 .venv/
 venv/
 ENV/
+.python-version
 
 # Distribution / packaging
 build/
 dist/
 *.egg-info/
 *.egg
+MANIFEST
+pip-wheel-metadata/
+__pypackages__/
 
 # Test / coverage
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+.tox/
 .mypy_cache/
 .ruff_cache/
 
@@ -26,10 +33,19 @@ htmlcov/
 .idea/
 .vscode/
 *.swp
+*.swo
+Thumbs.db
 
 # Environment and secrets
 .env
 .env.*
+!.env.example
+*.pem
+*.key
 
-# Local tooling
+# Logs
+*.log
+
+# Lock files (generated; not committed for libraries)
 uv.lock
+poetry.lock

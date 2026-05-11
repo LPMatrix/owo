@@ -1,0 +1,19 @@
+- id: balance_ha_001
+  input: "Duba asusuna"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: ha
+    flags: []
+  notes: "duba asusuna = check my account."
+
+- id: balance_ha_002
+  input: "Nawa ne kudin asusuna?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: ha
+    flags: []
+  notes: "nawa ne kudin = how much is the money."

@@ -1,0 +1,95 @@
+# Naija numerics ─────────────────────────────────────────────────────────────
+
+- id: edge_naija_half_milli_en
+  input: "Send half a milli to Kemi"
+  expected:
+    intent: transfer
+    amount: 500000
+    currency: NGN
+    recipient: Kemi
+    language_detected: en
+    flags: []
+  notes: "half a milli = 500,000 NGN."
+
+- id: edge_naija_milli_en
+  input: "Send 2 milli to Emeka"
+  expected:
+    intent: transfer
+    amount: 2000000
+    currency: NGN
+    recipient: Emeka
+    language_detected: en
+    flags: []
+  notes: "2 milli = 2,000,000 NGN."
+
+- id: edge_naija_half_milli_pcm
+  input: "Abeg send half a milli give Tunde"
+  expected:
+    intent: transfer
+    amount: 500000
+    currency: NGN
+    recipient: Tunde
+    language_detected: pcm
+    flags: []
+  notes: "Pidgin half a milli with give marker."
+
+- id: edge_naija_milli_pcm_give
+  input: "Send 1 milli give Ada"
+  expected:
+    intent: transfer
+    amount: 1000000
+    currency: NGN
+    recipient: Ada
+    language_detected: pcm
+    flags: []
+  notes: "give marker + milli notation."
+
+# Code-switching: bank name embedded after recipient ───────────────────────
+
+- id: edge_codesw_bank_pcm_gtbank
+  input: "Abeg send 5k to Chidi, GTBank"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Chidi
+    bank: GTBank
+    language_detected: pcm
+    flags: []
+  notes: "Classic CONTRIBUTING.md example — Pidgin + bank name."
+
+- id: edge_codesw_bank_en_zenith
+  input: "Send 10k to Zara, Zenith Bank"
+  expected:
+    intent: transfer
+    amount: 10000
+    currency: NGN
+    recipient: Zara
+    bank: Zenith Bank
+    language_detected: en
+    flags: []
+  notes: "English transfer + recognised bank name."
+
+- id: edge_codesw_bank_yo_gtbank
+  input: "Ran 5k si Ade, GTBank"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Ade
+    bank: GTBank
+    language_detected: yo
+    flags: []
+  notes: "Yoruba frame + code-switched bank name."
+
+- id: edge_codesw_bank_pcm_access
+  input: "Send am 20k to Bola, Access Bank"
+  expected:
+    intent: transfer
+    amount: 20000
+    currency: NGN
+    recipient: Bola
+    bank: Access Bank
+    language_detected: pcm
+    flags: []
+  notes: "send am (pcm) + Access Bank."

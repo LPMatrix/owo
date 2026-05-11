@@ -1,0 +1,19 @@
+- id: balance_yo_001
+  input: "Melo ni owo mi?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: yo
+    flags: []
+  notes: "melo ni owo mi = how much is my money."
+
+- id: balance_yo_002
+  input: "Iye owo mi to melo?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: yo
+    flags: []
+  notes: "iye owo mi to melo = what is the value of my money."

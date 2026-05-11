@@ -1,0 +1,19 @@
+- id: balance_ig_001
+  input: "Ego m ole dị?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: ig
+    flags: []
+  notes: "ego m ole dị = how much money do I have."
+
+- id: balance_ig_002
+  input: "Gwa m ego m nwere"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: ig
+    flags: []
+  notes: "gwa m ego m nwere = tell me the money I have."

@@ -1,0 +1,29 @@
+- id: balance_pcm_001
+  input: "How much I get?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: pcm
+    flags: []
+  notes: "Pidgin-inflected balance query."
+
+- id: balance_pcm_002
+  input: "How much dey my account?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: pcm
+    flags: []
+  notes: "dey (locative verb) is a clear pcm marker."
+
+- id: balance_pcm_003
+  input: "Wetin be my balance?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    language_detected: pcm
+    flags: []
+  notes: "wetin (what) is unambiguous Pidgin."

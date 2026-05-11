@@ -1,0 +1,55 @@
+- id: transfer_pcm_001
+  input: "Abeg send 5k to Chidi"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Chidi
+    language_detected: pcm
+    flags: []
+  notes: "abeg prefix + k notation."
+
+- id: transfer_pcm_002
+  input: "Send 20k give Mama"
+  expected:
+    intent: transfer
+    amount: 20000
+    currency: NGN
+    recipient: Mama
+    language_detected: pcm
+    flags: []
+  notes: "give instead of to is the pcm marker."
+
+- id: transfer_pcm_003
+  input: "Send am 5k to Leo"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Leo
+    language_detected: pcm
+    flags: []
+  notes: "Object pronoun 'am' marks Pidgin."
+
+- id: transfer_pcm_004
+  input: "Abeg send 1500 naira to Kemi"
+  expected:
+    intent: transfer
+    amount: 1500
+    currency: NGN
+    recipient: Kemi
+    language_detected: pcm
+    flags: []
+  notes: "abeg + plain naira amount."
+
+- id: transfer_pcm_005
+  input: "Abeg transfer money give Tunde"
+  expected:
+    intent: transfer
+    amount: null
+    currency: NGN
+    recipient: Tunde
+    language_detected: pcm
+    flags:
+      - missing_amount
+  notes: "abeg + give with no amount."

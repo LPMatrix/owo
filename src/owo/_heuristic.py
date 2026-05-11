@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from owo.result import OwoResult
+from owo.schema import Intent, Language, OwoResult
 
 _SEND_K = re.compile(
     r"(?i)^\s*send\s+(\d+)\s*k\s+to\s+(.+?)\s*$",
@@ -29,14 +29,14 @@ def heuristic_parse(text: str) -> OwoResult:
         amount = float(m.group(1)) * 1000.0
         recipient = _clean_recipient(m.group(2))
         return OwoResult(
-            intent="transfer",
+            intent=Intent.TRANSFER,
             amount=amount,
             currency="NGN",
             recipient=recipient,
             account_number=None,
             bank=None,
             service=None,
-            language_detected="en",
+            language_detected=Language.ENGLISH,
             confidence=0.85,
             flags=[],
             raw={"parser": "heuristic", "pattern": "send_Nk_to"},
@@ -46,14 +46,14 @@ def heuristic_parse(text: str) -> OwoResult:
     if m:
         recipient = _clean_recipient(m.group(1))
         return OwoResult(
-            intent="transfer",
+            intent=Intent.TRANSFER,
             amount=None,
             currency="NGN",
             recipient=recipient,
             account_number=None,
             bank=None,
             service=None,
-            language_detected="en",
+            language_detected=Language.ENGLISH,
             confidence=0.61,
             flags=["missing_amount"],
             raw={"parser": "heuristic", "pattern": "send_money_to"},
@@ -61,28 +61,28 @@ def heuristic_parse(text: str) -> OwoResult:
 
     if _BALANCE.match(t):
         return OwoResult(
-            intent="balance_check",
+            intent=Intent.BALANCE_CHECK,
             amount=None,
             currency="NGN",
             recipient=None,
             account_number=None,
             bank=None,
             service=None,
-            language_detected="en",
+            language_detected=Language.ENGLISH,
             confidence=0.72,
             flags=[],
             raw={"parser": "heuristic", "pattern": "balance_check"},
         )
 
     return OwoResult(
-        intent="balance_check",
+        intent=Intent.BALANCE_CHECK,
         amount=None,
         currency="NGN",
         recipient=None,
         account_number=None,
         bank=None,
         service=None,
-        language_detected="en",
+        language_detected=Language.ENGLISH,
         confidence=0.35,
         flags=["needs_llm_provider"],
         raw={"parser": "heuristic", "pattern": "fallback"},
@@ -105,14 +105,14 @@ def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
     if isinstance(flags, str):
         flags = [flags]
     return OwoResult(
-        intent=str(data.get("intent") or "balance_check"),
+        intent=Intent(data.get("intent") or Intent.BALANCE_CHECK),
         amount=data.get("amount"),
         currency=str(data.get("currency") or "NGN"),
         recipient=data.get("recipient"),
         account_number=data.get("account_number"),
         bank=data.get("bank"),
         service=data.get("service"),
-        language_detected=str(data.get("language_detected") or "en"),
+        language_detected=Language(data.get("language_detected") or Language.ENGLISH),
         confidence=float(data.get("confidence") or 0.5),
         flags=list(flags),
         raw={"parser": "provider", "source_text": source_text, "llm": data},

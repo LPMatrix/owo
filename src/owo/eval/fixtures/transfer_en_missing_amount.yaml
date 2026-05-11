@@ -1,0 +1,10 @@
+id: transfer_en_missing_amount
+input: "Send money to Tunde"
+expected:
+  intent: transfer
+  amount: null
+  currency: NGN
+  recipient: Tunde
+  flags:
+    - missing_amount
+notes: "Amount omitted — flags must surface missing_amount."

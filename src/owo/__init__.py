@@ -6,7 +6,7 @@ from owo._heuristic import (
     result_from_provider_json,
 )
 from owo.providers import BaseProvider
-from owo.result import OwoResult
+from owo.schema import Intent, Language, OwoResult
 
 
 def parse(text: str, *, provider: BaseProvider | None = None) -> OwoResult:
@@ -25,6 +25,8 @@ def parse(text: str, *, provider: BaseProvider | None = None) -> OwoResult:
 
 __all__ = [
     "BaseProvider",
+    "Intent",
+    "Language",
     "OwoResult",
     "parse",
 ]

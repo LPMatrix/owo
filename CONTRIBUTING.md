@@ -76,7 +76,7 @@ expected:
     - missing_amount
 ```
 
-Use the same field names the library exposes (`intent`, `amount`, `currency`, `recipient`, `account_number`, `bank`, `service`, `flags`, etc.). If the eval runner compares only a subset of fields, document that in the fixture directory README when it exists.
+Use the same field names the library exposes (`intent`, `amount`, `currency`, `recipient`, `account_number`, `bank`, `service`, `flags`, etc.). Valid `intent` values include `unknown` when asserting heuristic fallback or unresolved input. If the eval runner compares only a subset of fields, document that in the fixture directory README when it exists.
 
 ### Conventions
 

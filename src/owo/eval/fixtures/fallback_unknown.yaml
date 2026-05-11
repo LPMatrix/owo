@@ -1,0 +1,7 @@
+- id: fallback_unknown_001
+  input: "Buy 2GB data for 08012345678 on MTN"
+  expected:
+    intent: unknown
+    flags:
+      - needs_llm_provider
+  notes: "No offline heuristic — caller should use an LLM provider."

@@ -15,3 +15,21 @@
     currency: NGN
     flags: []
   notes: "Standard English balance check."
+
+- id: balance_en_003
+  input: "What's my balance?"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    flags: []
+  notes: "Common phrasing (smart quotes normalized before match)."
+
+- id: balance_en_004
+  input: "check my balance"
+  expected:
+    intent: balance_check
+    amount: null
+    currency: NGN
+    flags: []
+  notes: "Verb-first balance request."

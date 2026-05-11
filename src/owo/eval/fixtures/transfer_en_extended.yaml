@@ -1,0 +1,47 @@
+- id: transfer_en_transfer_keyword
+  input: "Transfer 5k to Leo"
+  expected:
+    intent: transfer
+    amount: 5000
+    currency: NGN
+    recipient: Leo
+    language_detected: en
+    confidence: 0.85
+    flags: []
+  notes: "transfer … k to … synonym for send."
+
+- id: transfer_en_plain_amount
+  input: "Send 12000 to Ife"
+  expected:
+    intent: transfer
+    amount: 12000
+    currency: NGN
+    recipient: Ife
+    language_detected: en
+    confidence: 0.83
+    flags: []
+  notes: "Full naira amount without k suffix."
+
+- id: transfer_en_comma_amount
+  input: "Send 15,000 naira to Kemi"
+  expected:
+    intent: transfer
+    amount: 15000
+    currency: NGN
+    recipient: Kemi
+    language_detected: en
+    confidence: 0.83
+    flags: []
+  notes: "Comma-separated thousands + optional naira word."
+
+- id: transfer_en_transfer_money
+  input: "Transfer money to Obi"
+  expected:
+    intent: transfer
+    amount: null
+    currency: NGN
+    recipient: Obi
+    language_detected: en
+    flags:
+      - missing_amount
+  notes: "transfer money to … mirrors send money to …"

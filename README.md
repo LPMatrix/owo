@@ -69,7 +69,7 @@ Every call returns an `OwoResult`:
 ```python
 @dataclass
 class OwoResult:
-    intent: str                    # transfer | bill_pay | buy_airtime | buy_data | crypto_sell | balance_check
+    intent: str                    # transfer | bill_pay | buy_airtime | buy_data | crypto_sell | balance_check | unknown
     amount: float | None
     currency: str                  # always "NGN" for now
     recipient: str | None
@@ -87,9 +87,11 @@ class OwoResult:
 ## Configuration
 
 By default, `parse()` runs a **small offline heuristic** for a handful of common
-English patterns so you can develop and run tests without API keys. For full
-multilingual coverage, pass a **provider** that implements `BaseProvider` from
-`owo` (for example Anthropic or OpenAI behind your own wrapper).
+English patterns so you can develop and run tests without API keys. Inputs that
+do not match any rule return `intent: "unknown"` with `needs_llm_provider` in
+`flags` so you can route them to a model. For full multilingual coverage, pass a
+**provider** that implements `BaseProvider` from `owo` (for example Anthropic
+or OpenAI behind your own wrapper).
 
 Swap in a provider via the abstraction:
 
@@ -143,6 +145,7 @@ Use `confidence` and `flags` to decide whether to ask the user for clarification
 | `buy_data`      | "Buy 5GB MTN data for my line"    |
 | `crypto_sell`   | "Sell 50 USDT"                    |
 | `balance_check` | "How much I get?"                 |
+| `unknown`       | Heuristic could not classify; use `flags` (`needs_llm_provider`) or an LLM provider |
 
 
 ---

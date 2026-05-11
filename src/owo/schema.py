@@ -11,6 +11,7 @@ class Intent(str, Enum):
     BUY_DATA = "buy_data"
     CRYPTO_SELL = "crypto_sell"
     BALANCE_CHECK = "balance_check"
+    UNKNOWN = "unknown"
 
 
 class Language(str, Enum):

@@ -30,7 +30,47 @@ def test_heuristic_balance() -> None:
 
 def test_heuristic_fallback() -> None:
     r = parse("Buy 2GB data for 08012345678 on MTN")
+    assert r.intent == "unknown"
     assert "needs_llm_provider" in r.flags
+
+
+def test_heuristic_transfer_keyword() -> None:
+    r = parse("Transfer 10k to  Ada ")
+    assert r.intent == "transfer"
+    assert r.amount == 10_000.0
+    assert r.recipient == "Ada"
+
+
+def test_heuristic_plain_naira_amount() -> None:
+    r = parse("Send 5,000 to Chidi")
+    assert r.intent == "transfer"
+    assert r.amount == 5000.0
+    assert r.recipient == "Chidi"
+
+
+def test_heuristic_plain_naira_with_symbol() -> None:
+    r = parse("transfer ₦20000 to Zara")
+    assert r.amount == 20_000.0
+    assert r.recipient == "Zara"
+
+
+def test_heuristic_transfer_money() -> None:
+    r = parse("Transfer money to Emeka")
+    assert r.intent == "transfer"
+    assert r.amount is None
+    assert "missing_amount" in r.flags
+    assert r.recipient == "Emeka"
+
+
+def test_heuristic_balance_whats_my_balance() -> None:
+    r = parse("What's my balance?")
+    assert r.intent == "balance_check"
+
+
+def test_heuristic_normalize_whitespace() -> None:
+    r = parse("  Send   2k  to  Ben  ")
+    assert r.amount == 2000.0
+    assert r.recipient == "Ben"
 
 
 def test_provider_json() -> None:
@@ -78,3 +118,25 @@ def test_provider_json_fenced() -> None:
 
     r = parse("x", provider=FenceProvider())
     assert r.recipient == "Ada"
+
+
+def test_provider_json_invalid_intent_maps_to_unknown() -> None:
+    class BadIntentProvider(BaseProvider):
+        def complete(self, prompt: str) -> str:
+            return json.dumps(
+                {
+                    "intent": "totally_fake_intent",
+                    "amount": None,
+                    "currency": "NGN",
+                    "recipient": None,
+                    "account_number": None,
+                    "bank": None,
+                    "service": None,
+                    "language_detected": "en",
+                    "confidence": 0.1,
+                    "flags": ["bad_model_output"],
+                }
+            )
+
+    r = parse("x", provider=BadIntentProvider())
+    assert r.intent == "unknown"

@@ -86,7 +86,12 @@ class OwoResult:
 
 ## Configuration
 
-`owo` ships with an Anthropic provider by default. Swap it out via the provider abstraction:
+By default, `parse()` runs a **small offline heuristic** for a handful of common
+English patterns so you can develop and run tests without API keys. For full
+multilingual coverage, pass a **provider** that implements `BaseProvider` from
+`owo` (for example Anthropic or OpenAI behind your own wrapper).
+
+Swap in a provider via the abstraction:
 
 ```python
 from owo import parse
@@ -190,8 +195,12 @@ Contributions welcome — especially test fixtures in Yoruba, Hausa, and Igbo, w
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the fixture format and how to add a new language normalization map.
 
+This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). Security
+disclosures: [SECURITY.md](./SECURITY.md). Changes are summarized in
+[CHANGELOG.md](./CHANGELOG.md).
+
 ---
 
 ## License
 
-MIT
+[MIT](./LICENSE)

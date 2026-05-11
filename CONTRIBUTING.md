@@ -12,30 +12,29 @@ Thank you for helping improve **owo**, the Nigerian-language financial intent pa
 
 ## Code of conduct
 
-Be respectful and constructive. Assume good intent. Harassment and discrimination are not tolerated.
+Please read [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md). Harassment and
+discrimination are not tolerated.
 
 ---
 
 ## Development setup
 
 1. **Python 3.10+** is required (see the README).
-2. Clone the repository and install in editable mode with dev dependencies when they are defined in the project (for example):
+2. Clone the repository and install in editable mode with dev (and eval) extras:
 
    ```bash
-   pip install -e ".[dev]"
+   pip install -e ".[dev,eval]"
    ```
 
-   If the project uses another tool (e.g. `uv`), prefer the commands documented in `pyproject.toml` or CI workflows once present.
+   You can also use `uv pip install -e ".[dev,eval]"` if you use [uv](https://github.com/astral-sh/uv).
 
-3. Run the test suite and eval before opening a PR:
+3. Lint, test, and run the eval runner before opening a PR:
 
    ```bash
+   ruff check src tests
    pytest
-   pip install -e ".[eval]"
    python -m owo.eval
    ```
-
-Adjust commands to match the repository once packaging and CI are in place.
 
 ---
 
@@ -88,7 +87,9 @@ Use the same field names the library exposes (`intent`, `amount`, `currency`, `r
 
 ### Where to put files
 
-Follow the layout used in the repository (for example `tests/fixtures/` or `owo/eval/fixtures/`). If unsure, open an issue or ask in your PR description.
+Ship eval YAML fixtures under **`src/owo/eval/fixtures/`** (see the sample file
+there). Unit tests live in **`tests/`**. If you are unsure where a new corpus
+belongs, open an issue or note it in your PR description.
 
 ---
 

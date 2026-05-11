@@ -1,0 +1,27 @@
+name: Eval / fixture contribution
+description: Propose or track new multilingual eval fixtures
+labels: ["fixtures"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Language(s), intent(s), and what gap the fixtures fill.
+    validations:
+      required: true
+
+  - type: textarea
+    id: samples
+    attributes:
+      label: Sample utterances (optional)
+      description: Paste a few realistic examples; full YAML can go in a PR.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: No real personal data (synthetic names / numbers only)
+          required: true
+        - label: I read CONTRIBUTING.md for fixture format and conventions
+          required: true

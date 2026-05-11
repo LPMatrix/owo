@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "owo-parse"
+version = "0.1.0"
+description = "Nigerian-language financial intent parser"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "owo contributors" }]
+keywords = [
+  "nlp",
+  "fintech",
+  "nigeria",
+  "pidgin",
+  "yoruba",
+  "hausa",
+  "igbo",
+  "intent-parsing",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
+]
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.8"]
+eval = ["pyyaml>=6"]
+
+[project.urls]
+Homepage = "https://github.com/LPMatrix/owo"
+Repository = "https://github.com/LPMatrix/owo"
+Issues = "https://github.com/LPMatrix/owo/issues"
+Changelog = "https://github.com/LPMatrix/owo/blob/main/CHANGELOG.md"
+
+[project.scripts]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+owo = ["py.typed", "eval/fixtures/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

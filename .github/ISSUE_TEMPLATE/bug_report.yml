@@ -1,0 +1,54 @@
+name: Bug report
+description: Report incorrect parsing, crashes, or unexpected behavior
+labels: ["bug"]
+body:
+  - type: textarea
+    id: input
+    attributes:
+      label: Exact input string
+      description: Copy-paste the user utterance you passed to `parse()`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Paste `OwoResult` fields or JSON / redacted `raw` as appropriate.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What should have been returned instead?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: owo-parse version or commit
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: e.g. 3.12.2
+    validations:
+      required: true
+
+  - type: textarea
+    id: provider
+    attributes:
+      label: Provider / model (if any)
+      description: Leave blank if you used the default offline heuristic.
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, minimal repro script, links to related issues.

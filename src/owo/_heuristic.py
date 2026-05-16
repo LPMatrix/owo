@@ -394,7 +394,22 @@ def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
             lines = lines[:-1]
         text = "\n".join(lines).strip()
 
-    data: dict[str, Any] = json.loads(text)
+    try:
+        data: dict[str, Any] = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return OwoResult(
+            intent=Intent.UNKNOWN,
+            amount=None,
+            currency="NGN",
+            recipient=None,
+            account_number=None,
+            bank=None,
+            service=None,
+            language_detected=Language.ENGLISH,
+            confidence=0.0,
+            flags=["bad_provider_output"],
+            raw={"parser": "provider", "source_text": source_text, "raw_output": payload},
+        )
     flags = data.get("flags") or []
     if isinstance(flags, str):
         flags = [flags]
@@ -422,14 +437,3 @@ def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
     )
 
 
-def build_parse_prompt(user_text: str) -> str:
-    return (
-        "You are a strict JSON emitter for Nigerian financial intents. "
-        "Reply with a single JSON object only (no markdown), keys: "
-        "intent, amount, currency, recipient, account_number, bank, service, "
-        "language_detected, confidence, flags (array of strings).\n"
-        "intent must be one of: transfer, bill_pay, buy_airtime, buy_data, "
-        "crypto_sell, balance_check, unknown (use unknown when unclear).\n"
-        "language_detected must be one of: en, pcm, yo, ha, ig.\n\n"
-        f"User said:\n{user_text!r}\n"
-    )

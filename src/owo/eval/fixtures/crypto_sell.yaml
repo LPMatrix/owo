@@ -1,0 +1,35 @@
+- id: crypto_sell_en_btc
+  input: "Sell 0.05 BTC"
+  requires_provider: true
+  expected:
+    intent: crypto_sell
+    amount: 0.05
+    currency: BTC
+    language_detected: en
+
+- id: crypto_sell_en_usdt
+  input: "Convert 500 USDT to naira"
+  requires_provider: true
+  expected:
+    intent: crypto_sell
+    amount: 500.0
+    currency: USDT
+    language_detected: en
+
+- id: crypto_sell_pcm_btc
+  input: "Abeg sell 0.1 BTC give me naira"
+  requires_provider: true
+  expected:
+    intent: crypto_sell
+    amount: 0.1
+    currency: BTC
+    language_detected: pcm
+
+- id: crypto_sell_ig_basic
+  input: "Zere ego crypto BTC 0.1"
+  requires_provider: true
+  expected:
+    intent: crypto_sell
+    amount: 0.1
+    currency: BTC
+    language_detected: ig

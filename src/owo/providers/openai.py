@@ -9,6 +9,7 @@ except ImportError as exc:
         "Install the OpenAI SDK: pip install 'owo-parse[openai]'"
     ) from exc
 
+from owo._prompt import SYSTEM_PROMPT, build_user_message
 from owo.providers import BaseProvider
 
 _DEFAULT_MODEL = "gpt-4o-mini"
@@ -37,15 +38,30 @@ class OpenAIProvider(BaseProvider):
         *,
         api_key: str | None = None,
         max_tokens: int = 512,
+        temperature: float = 0.0,
     ) -> None:
         self._client = _OpenAI(api_key=api_key)
         self._model = model or os.environ.get("OWO_OPENAI_MODEL", _DEFAULT_MODEL)
         self._max_tokens = max_tokens
+        self._temperature = temperature
 
     def complete(self, prompt: str) -> str:
         response = self._client.chat.completions.create(
             model=self._model,
             max_tokens=self._max_tokens,
+            temperature=self._temperature,
             messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content or ""
+
+    def complete_messages(self, user_text: str) -> str:
+        response = self._client.chat.completions.create(
+            model=self._model,
+            max_tokens=self._max_tokens,
+            temperature=self._temperature,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": build_user_message(user_text)},
+            ],
         )
         return response.choices[0].message.content or ""

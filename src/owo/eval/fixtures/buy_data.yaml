@@ -1,0 +1,38 @@
+- id: data_en_mtn
+  input: "Buy 1GB data for 08012345678 on MTN"
+  requires_provider: true
+  expected:
+    intent: buy_data
+    currency: NGN
+    account_number: "08012345678"
+    service: MTN
+    language_detected: en
+
+- id: data_en_airtel
+  input: "Get me 2GB Airtel data bundle for 09031112222"
+  requires_provider: true
+  expected:
+    intent: buy_data
+    currency: NGN
+    account_number: "09031112222"
+    service: Airtel
+    language_detected: en
+
+- id: data_pcm_abeg
+  input: "Abeg buy me 500MB data for 09031112222 on Glo"
+  requires_provider: true
+  expected:
+    intent: buy_data
+    currency: NGN
+    account_number: "09031112222"
+    service: Glo
+    language_detected: pcm
+
+- id: data_ha_basic
+  input: "Saya data 1GB don 08012345678 ta hanyar MTN"
+  requires_provider: true
+  expected:
+    intent: buy_data
+    currency: NGN
+    account_number: "08012345678"
+    language_detected: ha

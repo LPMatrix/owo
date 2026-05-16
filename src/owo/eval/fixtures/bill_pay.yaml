@@ -1,0 +1,49 @@
+- id: bill_pay_en_dstv
+  input: "Pay my DSTV subscription ₦4500"
+  requires_provider: true
+  expected:
+    intent: bill_pay
+    amount: 4500.0
+    currency: NGN
+    service: DSTV
+    language_detected: en
+
+- id: bill_pay_en_electricity
+  input: "Pay EKEDC electricity bill of 6000 naira"
+  requires_provider: true
+  expected:
+    intent: bill_pay
+    amount: 6000.0
+    currency: NGN
+    service: EKEDC
+    language_detected: en
+
+- id: bill_pay_pcm_nepa
+  input: "Abeg pay NEPA bill ₦3500"
+  requires_provider: true
+  expected:
+    intent: bill_pay
+    amount: 3500.0
+    currency: NGN
+    service: NEPA
+    language_detected: pcm
+
+- id: bill_pay_ha_dstv
+  input: "Biya DSTV bill ₦6000"
+  requires_provider: true
+  expected:
+    intent: bill_pay
+    amount: 6000.0
+    currency: NGN
+    service: DSTV
+    language_detected: ha
+
+- id: bill_pay_ig_gotv
+  input: "Kwuo GoTV bill nke ₦2500"
+  requires_provider: true
+  expected:
+    intent: bill_pay
+    amount: 2500.0
+    currency: NGN
+    service: GoTV
+    language_detected: ig

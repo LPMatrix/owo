@@ -1,0 +1,40 @@
+- id: airtime_en_basic
+  input: "Recharge 500 naira for 08012345678"
+  requires_provider: true
+  expected:
+    intent: buy_airtime
+    amount: 500.0
+    currency: NGN
+    account_number: "08012345678"
+    language_detected: en
+
+- id: airtime_en_with_network
+  input: "Buy MTN airtime of ₦200 for 08055559999"
+  requires_provider: true
+  expected:
+    intent: buy_airtime
+    amount: 200.0
+    currency: NGN
+    account_number: "08055559999"
+    service: MTN
+    language_detected: en
+
+- id: airtime_pcm_abeg
+  input: "Abeg recharge 1000 naira for 09031112222"
+  requires_provider: true
+  expected:
+    intent: buy_airtime
+    amount: 1000.0
+    currency: NGN
+    account_number: "09031112222"
+    language_detected: pcm
+
+- id: airtime_yo_basic
+  input: "Ra airtime ₦200 fun 08099998888"
+  requires_provider: true
+  expected:
+    intent: buy_airtime
+    amount: 200.0
+    currency: NGN
+    account_number: "08099998888"
+    language_detected: yo

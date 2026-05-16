@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from owo._heuristic import (
-    build_parse_prompt,
-    heuristic_parse,
-    result_from_provider_json,
-)
+from owo._heuristic import heuristic_parse, result_from_provider_json
+from owo._prompt import build_user_message
 from owo.providers import BaseProvider
 from owo.schema import Intent, Language, OwoResult
 
@@ -13,13 +10,14 @@ def parse(text: str, *, provider: BaseProvider | None = None) -> OwoResult:
     """
     Parse a free-form financial instruction into structured fields.
 
-    Without a *provider*, a small built-in heuristic handles a few English
-    patterns so local tests and evals can run offline. Pass a ``BaseProvider``
-    subclass to integrate an LLM backend.
+    The heuristic runs first in all cases. When a *provider* is supplied,
+    it is called only for inputs the heuristic cannot confidently handle
+    (i.e. the result carries a ``needs_llm_provider`` flag).
     """
-    if provider is None:
-        return heuristic_parse(text)
-    out = provider.complete(build_parse_prompt(text))
+    result = heuristic_parse(text)
+    if provider is None or "needs_llm_provider" not in result.flags:
+        return result
+    out = provider.complete_messages(text)
     return result_from_provider_json(out, text)
 
 

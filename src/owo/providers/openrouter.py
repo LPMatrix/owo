@@ -9,6 +9,7 @@ except ImportError as exc:
         "Install the OpenAI SDK: pip install 'owo-parse[openrouter]'"
     ) from exc
 
+from owo._prompt import SYSTEM_PROMPT, build_user_message
 from owo.providers import BaseProvider
 
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -24,7 +25,7 @@ class OpenRouterProvider(BaseProvider):
     - ``OWO_OPENROUTER_MODEL``  — default: ``openai/gpt-4o-mini``
     - ``OPENROUTER_API_KEY``    — required
 
-    Any model available on OpenRouter can be used, e.g. ``"google/gemini-flash-1.5"``.
+    Any model available on OpenRouter can be used, e.g. ``"google/gemini-2.0-flash"``.
 
     Usage::
 
@@ -40,6 +41,7 @@ class OpenRouterProvider(BaseProvider):
         *,
         api_key: str | None = None,
         max_tokens: int = 512,
+        temperature: float = 0.0,
     ) -> None:
         self._client = _OpenAI(
             base_url=_OPENROUTER_BASE_URL,
@@ -47,11 +49,25 @@ class OpenRouterProvider(BaseProvider):
         )
         self._model = model or os.environ.get("OWO_OPENROUTER_MODEL", _DEFAULT_MODEL)
         self._max_tokens = max_tokens
+        self._temperature = temperature
 
     def complete(self, prompt: str) -> str:
         response = self._client.chat.completions.create(
             model=self._model,
             max_tokens=self._max_tokens,
+            temperature=self._temperature,
             messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content or ""
+
+    def complete_messages(self, user_text: str) -> str:
+        response = self._client.chat.completions.create(
+            model=self._model,
+            max_tokens=self._max_tokens,
+            temperature=self._temperature,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": build_user_message(user_text)},
+            ],
         )
         return response.choices[0].message.content or ""

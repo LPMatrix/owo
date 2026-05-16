@@ -28,7 +28,14 @@ jobs:
         run: ruff check src tests
 
       - name: Pytest
-        run: pytest
+        run: pytest --cov=src/owo --cov-report=xml
+
+      - name: Upload coverage
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
 
       - name: Eval
         run: python -m owo.eval

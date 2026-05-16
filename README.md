@@ -1,5 +1,13 @@
 # owo
 
+[![PyPI](https://img.shields.io/pypi/v/owo-parse)](https://pypi.org/project/owo-parse/)
+[![Python](https://img.shields.io/pypi/pyversions/owo-parse)](https://pypi.org/project/owo-parse/)
+[![CI](https://github.com/LPMatrix/owo/actions/workflows/ci.yml/badge.svg)](https://github.com/LPMatrix/owo/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/LPMatrix/owo/branch/main/graph/badge.svg)](https://codecov.io/gh/LPMatrix/owo)
+[![Downloads](https://img.shields.io/pypi/dm/owo-parse)](https://pypi.org/project/owo-parse/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 **Nigerian-language financial intent parser.**
 
 `owo` takes a free-form financial instruction in English, Pidgin, Yoruba, Hausa, or Igbo — and returns structured JSON that any payment backend can consume.

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from owo._heuristic import heuristic_parse, result_from_provider_json
-from owo._prompt import build_user_message
+from owo._heuristic import heuristic_parse as _heuristic_parse
+from owo._heuristic import result_from_provider_json as _result_from_provider_json
 from owo.providers import BaseProvider
 from owo.schema import Intent, Language, OwoResult
 
@@ -14,11 +14,11 @@ def parse(text: str, *, provider: BaseProvider | None = None) -> OwoResult:
     it is called only for inputs the heuristic cannot confidently handle
     (i.e. the result carries a ``needs_llm_provider`` flag).
     """
-    result = heuristic_parse(text)
+    result = _heuristic_parse(text)
     if provider is None or "needs_llm_provider" not in result.flags:
         return result
     out = provider.complete_messages(text)
-    return result_from_provider_json(out, text)
+    return _result_from_provider_json(out, text)
 
 
 __all__ = [

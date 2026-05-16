@@ -9,13 +9,8 @@ from owo import parse
 
 result = parse("Send 20k to Mama")
 
-# {
-#   "intent": "transfer",
-#   "amount": 20000,
-#   "currency": "NGN",
-#   "recipient": "Mama",
-#   "confidence": 0.97
-# }
+# OwoResult(intent='transfer', amount=20000.0, currency='NGN',
+#           recipient='Mama', confidence=0.85, flags=[], ...)
 ```
 
 ---
@@ -69,7 +64,7 @@ Every call returns an `OwoResult`:
 ```python
 @dataclass
 class OwoResult:
-    intent: str                    # transfer | bill_pay | buy_airtime | buy_data | crypto_sell | balance_check | unknown | unknown
+    intent: str                    # transfer | bill_pay | buy_airtime | buy_data | crypto_sell | balance_check | unknown
     amount: float | None
     currency: str                  # always "NGN" for now
     recipient: str | None
@@ -79,7 +74,7 @@ class OwoResult:
     language_detected: str         # en | pcm | yo | ha | ig
     confidence: float              # 0.0 – 1.0
     flags: list[str]               # ["missing_amount", "ambiguous_recipient", ...]
-    raw: dict                      # full LLM response for debugging
+    raw: dict                      # parser metadata for debugging
 ```
 
 ---
@@ -99,18 +94,30 @@ parse("Aika dubu goma zuwa ga Ahmad")
 parse("Send half a milli to Kemi")
 ```
 
-To handle complex or ambiguous inputs, plug in an LLM provider. An Anthropic
-provider ships with the package:
+To handle complex or ambiguous inputs, plug in an LLM provider. Three providers
+ship with the package:
+
+```bash
+pip install 'owo-parse[anthropic]'   # Anthropic
+pip install 'owo-parse[openai]'      # OpenAI
+pip install 'owo-parse[openrouter]'  # OpenRouter (access to 200+ models)
+```
 
 ```python
 from owo import parse
-from owo.providers.anthropic import AnthropicProvider
+from owo.providers.anthropic import AnthropicProvider   # ANTHROPIC_API_KEY
+from owo.providers.openai import OpenAIProvider         # OPENAI_API_KEY
+from owo.providers.openrouter import OpenRouterProvider # OPENROUTER_API_KEY
 
 result = parse(
-    "Jẹ kí n san ₦5,000 fún DSTV mi",
-    provider=AnthropicProvider(),  # reads ANTHROPIC_API_KEY from env
+    "Buy 2GB data for 08012345678 on MTN",
+    provider=AnthropicProvider(),  # or OpenAIProvider() / OpenRouterProvider()
 )
 ```
+
+The heuristic always runs first — the provider is only called when the input falls
+outside the rule set (i.e. `needs_llm_provider` is in `result.flags`). This keeps
+costs low for common transfer and balance patterns.
 
 Or bring your own by subclassing `BaseProvider`:
 
@@ -119,8 +126,21 @@ from owo import BaseProvider
 
 class MyProvider(BaseProvider):
     def complete(self, prompt: str) -> str:
-        ...  # call any model here
+        # Fallback — called when complete_messages() is not overridden.
+        # Receives the full system + user prompt as a single string.
+        ...
+
+    def complete_messages(self, user_text: str) -> str:
+        # Preferred override — gives you the user text directly so you can
+        # pass the system prompt via your SDK's native system-message field.
+        response = my_llm_client.chat(
+            system=MY_SYSTEM_PROMPT,   # use owo._prompt.SYSTEM_PROMPT
+            user=user_text,
+        )
+        return response.text
 ```
+
+`SYSTEM_PROMPT` from `owo._prompt` contains the full instruction block with few-shot examples across all five languages — use it as-is or extend it.
 
 ---
 

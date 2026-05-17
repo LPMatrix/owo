@@ -9,7 +9,6 @@ from owo import parse
 from owo._prompt import SYSTEM_PROMPT
 from owo.providers import BaseProvider
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

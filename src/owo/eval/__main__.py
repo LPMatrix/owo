@@ -93,7 +93,7 @@ def _load_provider(spec: str) -> BaseProvider:
     try:
         module_name, cls_name = spec.rsplit(":", 1)
     except ValueError:
-        raise SystemExit(f"--provider must be 'module:ClassName', got: {spec!r}")
+        raise SystemExit(f"--provider must be 'module:ClassName', got: {spec!r}") from None
     try:
         mod = importlib.import_module(module_name)
     except ImportError as exc:
@@ -101,7 +101,7 @@ def _load_provider(spec: str) -> BaseProvider:
     try:
         cls = getattr(mod, cls_name)
     except AttributeError:
-        raise SystemExit(f"Class {cls_name!r} not found in {module_name!r}")
+        raise SystemExit(f"Class {cls_name!r} not found in {module_name!r}") from None
     return cls()
 
 

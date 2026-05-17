@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class Intent(str, Enum):
+class Intent(StrEnum):
     TRANSFER = "transfer"
     BILL_PAY = "bill_pay"
     BUY_AIRTIME = "buy_airtime"
@@ -14,7 +14,7 @@ class Intent(str, Enum):
     UNKNOWN = "unknown"
 
 
-class Language(str, Enum):
+class Language(StrEnum):
     ENGLISH = "en"
     PIDGIN = "pcm"
     YORUBA = "yo"

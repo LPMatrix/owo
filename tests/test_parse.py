@@ -4,7 +4,6 @@ import json
 
 from owo import BaseProvider, parse
 
-
 # ── English ────────────────────────────────────────────────────────────────
 
 def test_heuristic_send_k() -> None:

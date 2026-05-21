@@ -19,3 +19,11 @@ class BaseProvider(ABC):
         The default falls back to :meth:`complete` with both parts joined.
         """
         return self.complete(SYSTEM_PROMPT + "\n" + build_user_message(user_text))
+
+
+class BaseSTTProvider(ABC):
+    """Speech-to-text backend used by :func:`owo.parse_audio`."""
+
+    @abstractmethod
+    def transcribe(self, audio: bytes, *, filename: str = "audio.mp3") -> str:
+        """Return a plain-text transcript of *audio*."""

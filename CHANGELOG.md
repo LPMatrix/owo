@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] — 2026-05-21
+
 ### Added
 
+- **Voice input**: `parse_audio(audio, *, stt_provider, provider=None)` — transcribes
+  audio bytes via an STT backend then parses the transcript with the existing pipeline.
+- `BaseSTTProvider` abstract class (`owo.providers`) — one method:
+  `transcribe(audio: bytes, *, filename: str) -> str`. Subclass to bring any STT backend.
+- `WhisperProvider` (`owo.providers.whisper`) — backed by OpenAI Whisper;
+  supports language hints for `en`, `yo`, `ha`, `ig`; auto-detects for Pidgin.
+  Install with `pip install 'owo-parse[voice]'`.
+- `owo.__version__` — package version string, readable at runtime via
+  `importlib.metadata`.
 - Open source scaffolding: license, security policy, code of conduct, CI, and
   issue templates.
 - Minimal `owo` package layout with `parse()`, `OwoResult`, and `BaseProvider`.

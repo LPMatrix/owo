@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "owo-parse"
-version = "0.1.0"
+version = "0.2.0"
 description = "Nigerian-language financial intent parser"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -39,6 +39,7 @@ eval = ["pyyaml>=6"]
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.0"]
 openrouter = ["openai>=1.0"]
+voice = ["openai>=1.0"]
 
 [project.urls]
 Homepage = "https://github.com/LPMatrix/owo"

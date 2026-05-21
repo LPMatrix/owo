@@ -200,6 +200,57 @@ Mixed-language input (code-switching) is handled automatically — `owo` detects
 
 ---
 
+## Voice input
+
+`owo` can parse voice notes and audio directly via `parse_audio()`. Install the
+voice extra to get the Whisper STT provider:
+
+```bash
+pip install 'owo-parse[voice]'
+```
+
+```python
+from owo import parse_audio
+from owo.providers.whisper import WhisperProvider
+
+with open("voice_note.ogg", "rb") as f:
+    result = parse_audio(
+        f.read(),
+        stt_provider=WhisperProvider(),  # reads OPENAI_API_KEY from env
+    )
+
+# result.intent  → "transfer"
+# result.amount  → 5000.0
+# result.recipient → "Tunde"
+```
+
+The flow is: **audio bytes → Whisper transcription → `parse()`**. The LLM
+fallback still applies — pass `provider=` alongside `stt_provider=` if you need
+it for complex intents.
+
+**Language hints** — Whisper accepts a language code to improve accuracy. Pass
+the expected language for best results on accented or tonal speech:
+
+```python
+WhisperProvider(language="yo")   # Yoruba
+WhisperProvider(language="ha")   # Hausa
+WhisperProvider(language="ig")   # Igbo
+WhisperProvider(language="en")   # English
+# Omit language= for Nigerian Pidgin (auto-detect works best)
+```
+
+**Bring your own STT** — any backend works by subclassing `BaseSTTProvider`:
+
+```python
+from owo import BaseSTTProvider
+
+class GoogleSTTProvider(BaseSTTProvider):
+    def transcribe(self, audio: bytes, *, filename: str = "audio.mp3") -> str:
+        ...  # call Google Speech-to-Text here
+```
+
+---
+
 ## Running the eval suite
 
 `owo` ships with a benchmark suite of curated test fixtures across all five languages:

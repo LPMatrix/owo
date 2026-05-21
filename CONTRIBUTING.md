@@ -19,7 +19,7 @@ discrimination are not tolerated.
 
 ## Development setup
 
-1. **Python 3.10+** is required (see the README).
+1. **Python 3.11+** is required (see the README).
 2. Clone the repository and install in editable mode with dev (and eval) extras:
 
    ```bash
@@ -109,9 +109,10 @@ If the project exposes a specific module path for maps, mirror existing naming a
 
 ## Provider contributions
 
-Custom `BaseProvider` implementations are welcome. For a new first-party provider in-tree:
+Custom LLM and STT providers are welcome. For a new first-party provider in-tree:
 
-- Match the **`BaseProvider`** contract used by `parse()`.
+- Match the **`BaseProvider`** contract (for LLM) or **`BaseSTTProvider`** contract
+  (for speech-to-text) used by `parse()` and `parse_audio()` respectively.
 - Include **tests** that mock HTTP and assert prompt/response handling where applicable.
 - Document **env vars** and defaults in the README or provider docstring.
 

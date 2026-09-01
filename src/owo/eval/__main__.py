@@ -23,7 +23,7 @@ _TRACKED_FIELDS = [
     "bank",
     "service",
     "language_detected",
-    "confidence",
+    "field_confidence",
     "flags",
 ]
 
@@ -49,7 +49,7 @@ def _as_dict(result: OwoResult) -> dict[str, Any]:
         "bank": result.bank,
         "service": result.service,
         "language_detected": result.language_detected,
-        "confidence": result.confidence,
+        "field_confidence": dict(result.field_confidence),
         "flags": list(result.flags),
     }
 

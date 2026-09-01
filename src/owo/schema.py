@@ -34,6 +34,19 @@ class OwoResult:
     bank: str | None
     service: str | None
     language_detected: Language
-    confidence: float
+    field_confidence: dict[str, float] = field(default_factory=dict)
     flags: list[str] = field(default_factory=list)
     raw: dict = field(default_factory=dict)
+
+    def confidence_for(self, field_name: str, default: float = 0.0) -> float:
+        """Confidence (0.0–1.0) for a single field, or *default* if unscored."""
+        return self.field_confidence.get(field_name, default)
+
+    @property
+    def min_confidence(self) -> float:
+        """Lowest per-field confidence — the weakest link in the parse.
+
+        ``0.0`` when nothing was scored. Use this for a single go/no-go gate;
+        inspect :attr:`field_confidence` to see *which* field is shaky.
+        """
+        return min(self.field_confidence.values(), default=0.0)

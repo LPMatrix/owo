@@ -247,7 +247,12 @@ def test_provider_json() -> None:
                     "bank": None,
                     "service": "MTN",
                     "language_detected": "en",
-                    "confidence": 0.9,
+                    "field_confidence": {
+                        "intent": 0.95,
+                        "amount": 0.9,
+                        "service": 0.96,
+                        "language_detected": 0.94,
+                    },
                     "flags": [],
                 }
             )
@@ -256,6 +261,9 @@ def test_provider_json() -> None:
     assert r.intent == "buy_data"
     assert r.service == "MTN"
     assert r.amount == 500.0
+    assert r.field_confidence["service"] == 0.96
+    assert r.confidence_for("amount") == 0.9
+    assert r.min_confidence == 0.9
 
 
 def test_provider_json_fenced() -> None:
@@ -271,7 +279,7 @@ def test_provider_json_fenced() -> None:
                     "bank": None,
                     "service": None,
                     "language_detected": "en",
-                    "confidence": 0.8,
+                    "field_confidence": {"intent": 0.8, "recipient": 0.75},
                     "flags": [],
                 }
             )
@@ -279,6 +287,7 @@ def test_provider_json_fenced() -> None:
 
     r = parse("x", provider=FenceProvider())
     assert r.recipient == "Ada"
+    assert r.field_confidence == {"intent": 0.8, "recipient": 0.75}
 
 
 def test_provider_json_invalid_intent_maps_to_unknown() -> None:
@@ -294,10 +303,57 @@ def test_provider_json_invalid_intent_maps_to_unknown() -> None:
                     "bank": None,
                     "service": None,
                     "language_detected": "en",
-                    "confidence": 0.1,
+                    "field_confidence": {"intent": 0.1},
                     "flags": ["bad_model_output"],
                 }
             )
 
     r = parse("x", provider=BadIntentProvider())
     assert r.intent == "unknown"
+
+
+def test_provider_legacy_scalar_confidence_is_spread() -> None:
+    """A provider still emitting a bare `confidence` scalar is mapped to
+    per-field scores across the fields it populated."""
+
+    class LegacyProvider(BaseProvider):
+        def complete(self, prompt: str) -> str:
+            return json.dumps(
+                {
+                    "intent": "transfer",
+                    "amount": 1000.0,
+                    "currency": "NGN",
+                    "recipient": "Ada",
+                    "account_number": None,
+                    "bank": None,
+                    "service": None,
+                    "language_detected": "en",
+                    "confidence": 0.67,
+                    "flags": [],
+                }
+            )
+
+    r = parse("x", provider=LegacyProvider())
+    assert r.field_confidence["intent"] == 0.67
+    assert r.field_confidence["amount"] == 0.67
+    assert r.field_confidence["recipient"] == 0.67
+    assert "bank" not in r.field_confidence
+
+
+def test_heuristic_field_confidence_pinpoints_missing_amount() -> None:
+    r = parse("Send money to Tunde")
+    assert r.field_confidence["recipient"] >= 0.8
+    assert r.field_confidence["amount"] <= 0.3
+    assert r.min_confidence == r.field_confidence["amount"]
+
+
+def test_heuristic_field_confidence_scored_for_clean_transfer() -> None:
+    r = parse("Send 20k to Zara, Zenith Bank")
+    assert set(r.field_confidence) == {
+        "intent",
+        "amount",
+        "recipient",
+        "bank",
+        "language_detected",
+    }
+    assert all(0.0 <= v <= 1.0 for v in r.field_confidence.values())

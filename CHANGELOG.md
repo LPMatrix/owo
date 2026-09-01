@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Per-field confidence**: `OwoResult.field_confidence` — a `dict[str, float]`
+  mapping each scored field to its own 0.0–1.0 certainty, so a shaky parse points
+  at *which* field to distrust instead of collapsing to one number. Only fields
+  relevant to the detected intent are scored (`intent` and `language_detected`
+  always are).
+- `OwoResult.confidence_for(field, default=0.0)` and `OwoResult.min_confidence`
+  helpers.
+
+### Changed
+
+- **BREAKING**: removed the scalar `OwoResult.confidence`; use `field_confidence`
+  or `min_confidence`.
+- **BREAKING**: the provider JSON contract now expects a `field_confidence`
+  object instead of a `confidence` float. `SYSTEM_PROMPT` and its few-shot
+  examples are updated. Providers that still emit a bare `confidence` scalar are
+  handled for now by spreading that value across the populated fields.
+- Eval suite tracks `field_confidence` instead of `confidence`.
+
 ---
 
 ## [0.2.0] — 2026-05-21

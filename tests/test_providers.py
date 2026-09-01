@@ -23,7 +23,7 @@ def _make_json(**kwargs) -> str:
         "bank": None,
         "service": "MTN",
         "language_detected": "en",
-        "confidence": 0.92,
+        "field_confidence": {"intent": 0.95, "account_number": 0.96, "service": 0.94, "language_detected": 0.95},
         "flags": [],
     }
     base.update(kwargs)

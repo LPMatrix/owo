@@ -193,6 +193,33 @@ def _parse_plain_amount(digits: str) -> float:
     return float(digits.replace(",", ""))
 
 
+# ---------------------------------------------------------------------------
+# Per-field confidence
+# ---------------------------------------------------------------------------
+# How strongly the language guess is backed by the matched pattern. Pidgin and
+# the three regional languages fire only on unambiguous markers, so they score
+# higher than English (whose keywords double as loan words elsewhere).
+_LANG_CONF: dict[Language, float] = {
+    Language.ENGLISH: 0.80,
+    Language.PIDGIN: 0.90,
+    Language.HAUSA: 0.88,
+    Language.YORUBA: 0.88,
+    Language.IGBO: 0.88,
+}
+
+# Every heuristic transfer/balance match fires on an explicit, unambiguous verb.
+_INTENT_CONF = 0.95
+# Recipient is captured verbatim from the pattern tail — high, but free text.
+_RECIPIENT_CONF = 0.90
+# Bank is only set when it matched the known-institutions list.
+_BANK_CONF = 0.95
+# Amount confidence by how the figure was derived.
+_AMOUNT_CONF_EXPLICIT = 0.97  # "20k", "₦5,000", "dubu 10"
+_AMOUNT_CONF_WORD = 0.90  # "half a milli", "dubu goma"
+# Amount could not be determined at all (paired with a missing_amount flag).
+_AMOUNT_CONF_MISSING = 0.20
+
+
 def _clean_recipient(name: str) -> str:
     return name.strip().rstrip(",.").strip()
 
@@ -202,11 +229,19 @@ def _transfer_result(
     amount: float | None,
     recipient: str,
     language: Language,
-    confidence: float,
+    amount_conf: float,
     flags: list[str],
     pattern: str,
 ) -> OwoResult:
     name, bank = _extract_bank(recipient)
+    field_confidence = {
+        "intent": _INTENT_CONF,
+        "recipient": _RECIPIENT_CONF,
+        "language_detected": _LANG_CONF[language],
+        "amount": _AMOUNT_CONF_MISSING if amount is None else amount_conf,
+    }
+    if bank is not None:
+        field_confidence["bank"] = _BANK_CONF
     return OwoResult(
         intent=Intent.TRANSFER,
         amount=amount,
@@ -216,7 +251,7 @@ def _transfer_result(
         bank=bank,
         service=None,
         language_detected=language,
-        confidence=confidence,
+        field_confidence=field_confidence,
         flags=list(flags),
         raw={"parser": "heuristic", "pattern": pattern},
     )
@@ -232,7 +267,10 @@ def _balance_result(language: Language, pattern: str) -> OwoResult:
         bank=None,
         service=None,
         language_detected=language,
-        confidence=0.72,
+        field_confidence={
+            "intent": _INTENT_CONF,
+            "language_detected": _LANG_CONF[language],
+        },
         flags=[],
         raw={"parser": "heuristic", "pattern": pattern},
     )
@@ -249,51 +287,51 @@ def heuristic_parse(text: str) -> OwoResult:
     # --- Nigerian Pidgin (pcm) ---
     m = _PCM_ABEG_K.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.PIDGIN, confidence=0.85, flags=[], pattern="pcm_abeg_Nk")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="pcm_abeg_Nk")
 
     m = _PCM_ABEG_NAIRA.match(t)
     if m:
-        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.PIDGIN, confidence=0.83, flags=[], pattern="pcm_abeg_naira")
+        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="pcm_abeg_naira")
 
     m = _PCM_ABEG_HALF_MILLI.match(t)
     if m:
-        return _transfer_result(amount=500_000.0, recipient=m.group(1), language=Language.PIDGIN, confidence=0.83, flags=[], pattern="pcm_abeg_half_milli")
+        return _transfer_result(amount=500_000.0, recipient=m.group(1), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_WORD, flags=[], pattern="pcm_abeg_half_milli")
 
     m = _PCM_ABEG_MILLI.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1_000_000, recipient=m.group(2), language=Language.PIDGIN, confidence=0.83, flags=[], pattern="pcm_abeg_milli")
+        return _transfer_result(amount=float(m.group(1)) * 1_000_000, recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_WORD, flags=[], pattern="pcm_abeg_milli")
 
     m = _PCM_GIVE_K.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.PIDGIN, confidence=0.85, flags=[], pattern="pcm_give_Nk")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="pcm_give_Nk")
 
     m = _PCM_GIVE_NAIRA.match(t)
     if m:
-        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.PIDGIN, confidence=0.83, flags=[], pattern="pcm_give_naira")
+        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="pcm_give_naira")
 
     m = _PCM_GIVE_HALF_MILLI.match(t)
     if m:
-        return _transfer_result(amount=500_000.0, recipient=m.group(1), language=Language.PIDGIN, confidence=0.83, flags=[], pattern="pcm_give_half_milli")
+        return _transfer_result(amount=500_000.0, recipient=m.group(1), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_WORD, flags=[], pattern="pcm_give_half_milli")
 
     m = _PCM_GIVE_MILLI.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1_000_000, recipient=m.group(2), language=Language.PIDGIN, confidence=0.83, flags=[], pattern="pcm_give_milli")
+        return _transfer_result(amount=float(m.group(1)) * 1_000_000, recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_WORD, flags=[], pattern="pcm_give_milli")
 
     m = _PCM_AM_K.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.PIDGIN, confidence=0.85, flags=[], pattern="pcm_am_Nk")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="pcm_am_Nk")
 
     m = _PCM_AM_NAIRA.match(t)
     if m:
-        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.PIDGIN, confidence=0.83, flags=[], pattern="pcm_am_naira")
+        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="pcm_am_naira")
 
     m = _PCM_ABEG_MONEY.match(t)
     if m:
-        return _transfer_result(amount=None, recipient=m.group(1), language=Language.PIDGIN, confidence=0.61, flags=["missing_amount"], pattern="pcm_abeg_money")
+        return _transfer_result(amount=None, recipient=m.group(1), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_MISSING, flags=["missing_amount"], pattern="pcm_abeg_money")
 
     m = _PCM_GIVE_MONEY.match(t)
     if m:
-        return _transfer_result(amount=None, recipient=m.group(1), language=Language.PIDGIN, confidence=0.61, flags=["missing_amount"], pattern="pcm_give_money")
+        return _transfer_result(amount=None, recipient=m.group(1), language=Language.PIDGIN, amount_conf=_AMOUNT_CONF_MISSING, flags=["missing_amount"], pattern="pcm_give_money")
 
     if _PCM_BALANCE.match(t):
         return _balance_result(Language.PIDGIN, "pcm_balance")
@@ -301,17 +339,17 @@ def heuristic_parse(text: str) -> OwoResult:
     # --- Hausa (ha) ---
     m = _HA_TRANSFER_K.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.HAUSA, confidence=0.83, flags=[], pattern="ha_aika_Nk")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.HAUSA, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="ha_aika_Nk")
 
     m = _HA_TRANSFER_DUBU_WORD.match(t)
     if m:
         multiplier = _HA_NUM_WORDS.get(m.group(1).lower())
         if multiplier is not None:
-            return _transfer_result(amount=float(multiplier * 1000), recipient=m.group(2), language=Language.HAUSA, confidence=0.80, flags=[], pattern="ha_aika_dubu_word")
+            return _transfer_result(amount=float(multiplier * 1000), recipient=m.group(2), language=Language.HAUSA, amount_conf=_AMOUNT_CONF_WORD, flags=[], pattern="ha_aika_dubu_word")
 
     m = _HA_TRANSFER_DUBU_N.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.HAUSA, confidence=0.80, flags=[], pattern="ha_aika_dubu_N")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.HAUSA, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="ha_aika_dubu_N")
 
     if _HA_BALANCE.match(t):
         return _balance_result(Language.HAUSA, "ha_balance")
@@ -319,11 +357,11 @@ def heuristic_parse(text: str) -> OwoResult:
     # --- Yoruba (yo) ---
     m = _YO_TRANSFER_K.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.YORUBA, confidence=0.83, flags=[], pattern="yo_ran_Nk_si")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.YORUBA, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="yo_ran_Nk_si")
 
     m = _YO_TRANSFER_NAIRA.match(t)
     if m:
-        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.YORUBA, confidence=0.81, flags=[], pattern="yo_fi_naira_ransẹ_si")
+        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.YORUBA, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="yo_fi_naira_ransẹ_si")
 
     if _YO_BALANCE.match(t):
         return _balance_result(Language.YORUBA, "yo_balance")
@@ -331,11 +369,11 @@ def heuristic_parse(text: str) -> OwoResult:
     # --- Igbo (ig) ---
     m = _IG_TRANSFER_K.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.IGBO, confidence=0.83, flags=[], pattern="ig_zipu_ego_Nk_nye")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.IGBO, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="ig_zipu_ego_Nk_nye")
 
     m = _IG_TRANSFER_NAIRA.match(t)
     if m:
-        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.IGBO, confidence=0.81, flags=[], pattern="ig_zipu_ego_naira_nye")
+        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.IGBO, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="ig_zipu_ego_naira_nye")
 
     if _IG_BALANCE.match(t):
         return _balance_result(Language.IGBO, "ig_balance")
@@ -343,23 +381,23 @@ def heuristic_parse(text: str) -> OwoResult:
     # --- English (en) ---
     m = _EN_TRANSFER_K.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.ENGLISH, confidence=0.85, flags=[], pattern="en_send_Nk_to")
+        return _transfer_result(amount=float(m.group(1)) * 1000, recipient=m.group(2), language=Language.ENGLISH, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="en_send_Nk_to")
 
     m = _EN_TRANSFER_NAIRA.match(t)
     if m:
-        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.ENGLISH, confidence=0.83, flags=[], pattern="en_send_naira_to")
+        return _transfer_result(amount=_parse_plain_amount(m.group(1)), recipient=m.group(2), language=Language.ENGLISH, amount_conf=_AMOUNT_CONF_EXPLICIT, flags=[], pattern="en_send_naira_to")
 
     m = _EN_TRANSFER_HALF_MILLI.match(t)
     if m:
-        return _transfer_result(amount=500_000.0, recipient=m.group(1), language=Language.ENGLISH, confidence=0.83, flags=[], pattern="en_send_half_milli_to")
+        return _transfer_result(amount=500_000.0, recipient=m.group(1), language=Language.ENGLISH, amount_conf=_AMOUNT_CONF_WORD, flags=[], pattern="en_send_half_milli_to")
 
     m = _EN_TRANSFER_MILLI.match(t)
     if m:
-        return _transfer_result(amount=float(m.group(1)) * 1_000_000, recipient=m.group(2), language=Language.ENGLISH, confidence=0.83, flags=[], pattern="en_send_milli_to")
+        return _transfer_result(amount=float(m.group(1)) * 1_000_000, recipient=m.group(2), language=Language.ENGLISH, amount_conf=_AMOUNT_CONF_WORD, flags=[], pattern="en_send_milli_to")
 
     m = _EN_TRANSFER_MONEY.match(t)
     if m:
-        return _transfer_result(amount=None, recipient=m.group(1), language=Language.ENGLISH, confidence=0.61, flags=["missing_amount"], pattern="en_send_money_to")
+        return _transfer_result(amount=None, recipient=m.group(1), language=Language.ENGLISH, amount_conf=_AMOUNT_CONF_MISSING, flags=["missing_amount"], pattern="en_send_money_to")
 
     if _EN_BALANCE.match(t):
         return _balance_result(Language.ENGLISH, "en_balance")
@@ -373,7 +411,7 @@ def heuristic_parse(text: str) -> OwoResult:
         bank=None,
         service=None,
         language_detected=Language.ENGLISH,
-        confidence=0.35,
+        field_confidence={"intent": 0.20, "language_detected": 0.30},
         flags=["needs_llm_provider"],
         raw={"parser": "heuristic", "pattern": "fallback"},
     )
@@ -382,6 +420,52 @@ def heuristic_parse(text: str) -> OwoResult:
 # ---------------------------------------------------------------------------
 # Provider path
 # ---------------------------------------------------------------------------
+
+_PROVIDER_SCORED_FIELDS = (
+    "intent",
+    "amount",
+    "currency",
+    "recipient",
+    "account_number",
+    "bank",
+    "service",
+    "language_detected",
+)
+
+
+def _clamp01(value: float) -> float:
+    return 0.0 if value < 0.0 else 1.0 if value > 1.0 else value
+
+
+def _coerce_field_confidence(data: dict[str, Any]) -> dict[str, float]:
+    """Pull ``field_confidence`` out of provider JSON, tolerant of shape.
+
+    Accepts the current ``{"amount": 0.9, ...}`` object. Falls back to
+    spreading a legacy scalar ``confidence`` across the populated fields so
+    older prompts keep producing usable per-field numbers.
+    """
+    raw = data.get("field_confidence")
+    scored: dict[str, float] = {}
+    if isinstance(raw, dict):
+        for key, val in raw.items():
+            try:
+                scored[str(key)] = _clamp01(float(val))
+            except (TypeError, ValueError):
+                continue
+        if scored:
+            return scored
+
+    legacy = data.get("confidence")
+    if legacy is not None:
+        try:
+            flat = _clamp01(float(legacy))
+        except (TypeError, ValueError):
+            return scored
+        for key in _PROVIDER_SCORED_FIELDS:
+            if data.get(key) is not None:
+                scored[key] = flat
+    return scored
+
 
 def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
     """Parse JSON from an LLM provider into :class:`OwoResult`."""
@@ -406,7 +490,7 @@ def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
             bank=None,
             service=None,
             language_detected=Language.ENGLISH,
-            confidence=0.0,
+            field_confidence={},
             flags=["bad_provider_output"],
             raw={"parser": "provider", "source_text": source_text, "raw_output": payload},
         )
@@ -431,7 +515,7 @@ def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
         bank=data.get("bank"),
         service=data.get("service"),
         language_detected=language,
-        confidence=float(data.get("confidence") or 0.5),
+        field_confidence=_coerce_field_confidence(data),
         flags=list(flags),
         raw={"parser": "provider", "source_text": source_text, "llm": data},
     )

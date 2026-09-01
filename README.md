@@ -17,8 +17,9 @@ from owo import parse
 
 result = parse("Send 20k to Mama")
 
-# OwoResult(intent='transfer', amount=20000.0, currency='NGN',
-#           recipient='Mama', confidence=0.85, flags=[], ...)
+# OwoResult(intent='transfer', amount=20000.0, currency='NGN', recipient='Mama',
+#           field_confidence={'intent': 0.95, 'amount': 0.97, 'recipient': 0.9,
+#                             'language_detected': 0.8}, flags=[], ...)
 ```
 
 ---
@@ -80,9 +81,19 @@ class OwoResult:
     bank: str | None
     service: str | None            # MTN | DSTV | EKEDC | ...
     language_detected: str         # en | pcm | yo | ha | ig
-    confidence: float              # 0.0 – 1.0
+    field_confidence: dict[str, float]  # per-field certainty, e.g. {"amount": 0.97, "recipient": 0.9}
     flags: list[str]               # ["missing_amount", "ambiguous_recipient", ...]
     raw: dict                      # parser metadata for debugging
+```
+
+`field_confidence` scores each field on its own, so a shaky result tells you
+*which* field to distrust rather than collapsing to one vague number. Only the
+fields that are in play for the detected intent are scored (`intent` and
+`language_detected` always are). Two helpers come with it:
+
+```python
+result.confidence_for("amount", default=0.0)  # one field's score
+result.min_confidence                          # weakest field — a single go/no-go gate
 ```
 
 ---
@@ -159,12 +170,18 @@ class MyProvider(BaseProvider):
 ```python
 result = parse("Send money to Tunde")
 
-result.amount        # None
-result.flags         # ["missing_amount"]
-result.confidence    # 0.61
+result.amount                       # None
+result.flags                        # ["missing_amount"]
+result.field_confidence             # {"intent": 0.95, "recipient": 0.9,
+                                    #  "language_detected": 0.8, "amount": 0.2}
+result.confidence_for("amount")     # 0.2  ← the field to ask about
+result.confidence_for("recipient")  # 0.9  ← keep as-is
+result.min_confidence               # 0.2
 ```
 
-Use `confidence` and `flags` to decide whether to ask the user for clarification before passing the result downstream.
+Use `field_confidence` (or `min_confidence` for a single gate) together with
+`flags` to decide whether — and about *which field* — to ask the user for
+clarification before passing the result downstream.
 
 ---
 

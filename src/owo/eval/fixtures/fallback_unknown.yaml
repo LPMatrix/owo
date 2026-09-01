@@ -2,6 +2,8 @@
   input: "Buy 2GB data for 08012345678 on MTN"
   expected:
     intent: unknown
+    field_confidence:
+      intent: "<0.5"
     flags:
       - needs_llm_provider
   notes: "No offline heuristic — caller should use an LLM provider."

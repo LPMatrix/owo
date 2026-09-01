@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.3.0] — 2026-09-01
+
 ### Added
 
 - **Per-field confidence**: `OwoResult.field_confidence` — a `dict[str, float]`
@@ -16,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   always are).
 - `OwoResult.confidence_for(field, default=0.0)` and `OwoResult.min_confidence`
   helpers.
+- Eval fixtures may assert `field_confidence` with numeric comparators —
+  `">=0.9"`, `"<0.3"`, `"0.8..1.0"`, or a bare number for exact match.
 
 ### Changed
 
@@ -25,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   object instead of a `confidence` float. `SYSTEM_PROMPT` and its few-shot
   examples are updated. Providers that still emit a bare `confidence` scalar are
   handled for now by spreading that value across the populated fields.
+- The heuristic derives the `missing_amount` / `missing_recipient` flags from the
+  same per-field scores it emits, so a flag and its field score can no longer
+  drift apart.
 - Eval suite tracks `field_confidence` instead of `confidence`.
 
 ---

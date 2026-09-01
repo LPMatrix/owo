@@ -9,5 +9,9 @@ expected:
   bank: null
   service: null
   language_detected: en
+  field_confidence:
+    intent: ">=0.9"
+    amount: ">=0.95"
+    recipient: "0.8..1.0"
   flags: []
-notes: "Heuristic English transfer pattern (offline eval)."
+notes: "Heuristic English transfer pattern (offline eval). field_confidence uses comparators."

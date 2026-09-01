@@ -70,7 +70,41 @@ def _load_fixtures() -> list[dict[str, Any]]:
     return items
 
 
-def _same(expected: Any, actual: Any) -> bool:
+def _match_number(spec: Any, actual: Any) -> bool:
+    """Compare *actual* against *spec*, which may be a plain number or a string
+    comparator: ``">=0.9"``, ``"<0.3"``, ``"0.8..1.0"`` (inclusive range), or a
+    bare ``"0.95"`` for exact match."""
+    if isinstance(spec, (int, float)):
+        return isinstance(actual, (int, float)) and float(spec) == float(actual)
+    if not isinstance(spec, str) or not isinstance(actual, (int, float)):
+        return spec == actual
+    s = spec.strip()
+    try:
+        if ".." in s:
+            lo, hi = (float(p) for p in s.split("..", 1))
+            return lo <= actual <= hi
+        for op in (">=", "<=", ">", "<", "=="):
+            if s.startswith(op):
+                bound = float(s[len(op):])
+                return {
+                    ">=": actual >= bound,
+                    "<=": actual <= bound,
+                    ">": actual > bound,
+                    "<": actual < bound,
+                    "==": actual == bound,
+                }[op]
+        return float(s) == float(actual)
+    except ValueError:
+        return False
+
+
+def _same(expected: Any, actual: Any, *, key: str | None = None) -> bool:
+    if key == "field_confidence" and isinstance(expected, dict):
+        # Only the keys the fixture names are checked; each may use a comparator.
+        actual = actual if isinstance(actual, dict) else {}
+        return all(
+            k in actual and _match_number(v, actual[k]) for k, v in expected.items()
+        )
     if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
         return float(expected) == float(actual)
     if isinstance(expected, list) and isinstance(actual, list):
@@ -83,7 +117,7 @@ def _same(expected: Any, actual: Any) -> bool:
 def _compare(expected: dict[str, Any], actual: dict[str, Any]) -> list[str]:
     mismatches: list[str] = []
     for key, exp in expected.items():
-        if not _same(exp, actual.get(key)):
+        if not _same(exp, actual.get(key), key=key):
             mismatches.append(f"{key}: expected {exp!r}, got {actual.get(key)!r}")
     return mismatches
 
@@ -173,7 +207,7 @@ def _print_summary(results: list[_FixtureResult]) -> None:
             if f not in r.expected:
                 continue
             field_total[f] += 1
-            if _same(r.expected[f], r.actual.get(f)):
+            if _same(r.expected[f], r.actual.get(f), key=f):
                 field_hits[f] += 1
 
     print("\nBy intent:")

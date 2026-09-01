@@ -39,6 +39,9 @@
     currency: NGN
     recipient: Obi
     language_detected: en
+    field_confidence:
+      amount: "<0.5"
+      recipient: ">=0.8"
     flags:
       - missing_amount
-  notes: "transfer money to … mirrors send money to …"
+  notes: "transfer money to … mirrors send money to …; missing amount scored low."

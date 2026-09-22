@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Heuristic silently corrupted the recipient on any trailing word.** Every
+  transfer pattern's `(.+)$` capture ran to the end of the string, so filler
+  after the name — "send 20k to mama **pls**", "...mama **now**" — became part
+  of `recipient` with no flag and high confidence. Trailing filler (`pls`,
+  `please`, `now`, `abeg`, `sha`, `jare`, `biko`) is now trimmed before the
+  recipient is returned.
+
+### Added
+
+- The heuristic strips common leading filler/politeness phrases ("hey",
+  "pls", "can you", "i want to", "kindly") before matching, so natural
+  phrasing like "hey abeg send 20k to mama" or "can you send 20k to my mum"
+  now resolves instead of falling through to `unknown`.
+- `abeg` tolerates a following comma ("Abeg, send 5k give Chidi").
+- The `Nk` amount patterns accept an optional trailing "naira" ("transfer 20k
+  naira to mama's account").
+- A connector-less object-first fallback for English: "send mama 20k" (no
+  "to"/"give"). Scored lower (`intent`/`recipient` confidence) than a
+  connector-anchored match, since there's no connector word to anchor the
+  recipient boundary on.
+- `_EN_BALANCE` recognizes a couple more natural phrasings: "how much is in
+  my account", "what's in my account".
+- `OwoResult.confidence_for` and `min_confidence` reflect the above: a
+  trimmed-but-clean recipient scores slightly lower than an untouched one, and
+  the object-first fallback scores lower than a connector-anchored match —
+  same "explicit vs. inferred" scale the per-field scores already use.
+
+A verb-less input ("20k to mama") is still an intentional miss — too
+ambiguous to guess without a provider. Object-first matching is English-only
+for now; the other four languages keep their existing connector-anchored
+patterns.
+
+### Changed
+
+- **Rewrote the heuristic matching engine.** `_heuristic.py` previously had
+  ~30 duplicated, hand-anchored regex blocks (one per language × amount-shape
+  combination), and language was decided by a hardcoded try-pcm-then-ha-then-
+  yo-then-ig-then-en cascade. Replaced with:
+  - A **shared amount-shape library** (`_extract_amount_k`,
+    `_extract_amount_plain`, `_extract_amount_half_milli`,
+    `_extract_amount_milli`, `_extract_amount_dubu_word`,
+    `_extract_amount_dubu_n`) that each language's grammar composes from,
+    instead of re-deriving the same amount regex per language.
+  - A **generic transfer grammar** (`_match_transfer`) parameterized by
+    verb/connector regex + amount shapes + an optional pre-amount token
+    (Igbo's "ego"), so each language is now a short declarative call
+    (`_match_en_transfer`, `_match_ha_transfer`, `_match_yo_transfer`,
+    `_match_ig_transfer`) instead of 5-7 hand-written full-line regexes.
+    Pidgin keeps its own wrapper (`_match_pcm_transfer`) since its
+    disambiguation rule — leading "abeg" OR a "give" connector OR trailing
+    "am" — is a genuine three-way disjunction the generic template doesn't
+    fit.
+  - **Marker-scored language ranking** (`_score_languages`,
+    `_ranked_languages`) replacing the fixed cascade order: each language has
+    a weighted marker set (Hausa's "aika"/"dubu" score high; English's
+    "send"/"transfer" score low since they double as pidgin's verbs too),
+    and languages are tried in the order their evidence in *this* utterance
+    ranks them — not a hardcoded position.
+  - **Computed `language_detected` confidence** (`_language_confidence`)
+    replacing the static per-language lookup table — blends each language's
+    baseline reliability with how dominant its marker evidence was relative
+    to competing languages in the specific input, so a clean unambiguous
+    sentence now scores higher than one with cross-language noise.
+  - **Normalization/typo-tolerance pass** ahead of matching:
+    `_canonicalize_variants` folds a small set of texting abbreviations
+    ("pls"/"plz"/"plse" → "please", "abg" → "abeg", "nw" → "now") to a
+    canonical spelling before anything else runs (inspired by the finding in
+    "Modeling Orthographic Variation Improves NLP Performance for Nigerian
+    Pidgin", arXiv:2404.18264, that canonicalizing spelling variation before
+    matching helps); `_fuzzy_correct_leading_token` typo-corrects the leading
+    verb/marker token against the closed vocabulary via stdlib `difflib`
+    (cutoff 0.8, single-token blast radius only — e.g. "trasfer 20k to mama"
+    now resolves). No new dependency.
+  - `OwoResult.field_confidence` and all pattern outcomes are unchanged for
+    every existing test/fixture; this is an internal architecture change, not
+    a behavior change for previously-covered input (verified against the
+    full 89-test/41-fixture suite plus an ad hoc adversarial/false-positive
+    check).
+
 ---
 
 ## [0.3.0] — 2026-09-01

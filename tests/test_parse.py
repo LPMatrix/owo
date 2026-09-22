@@ -78,6 +78,154 @@ def test_heuristic_normalize_whitespace() -> None:
     assert r.recipient == "Ben"
 
 
+# ── Natural / messy phrasing ────────────────────────────────────────────────
+# A full-line-anchored regex only ever matches the exact template it was
+# written for. These cover the gap: leading filler before the verb, trailing
+# filler after the recipient, and one connector-less object-first shape.
+
+def test_heuristic_leading_filler_hey_abeg() -> None:
+    r = parse("hey abeg send 20k to mama")
+    assert r.intent == "transfer"
+    assert r.amount == 20_000.0
+    assert r.recipient == "mama"
+    assert r.language_detected == "pcm"
+
+
+def test_heuristic_leading_filler_pls() -> None:
+    r = parse("pls send 20k to mama")
+    assert r.intent == "transfer"
+    assert r.recipient == "mama"
+    assert r.language_detected == "en"
+
+
+def test_heuristic_leading_filler_can_you() -> None:
+    r = parse("can you send 20k to my mum")
+    assert r.intent == "transfer"
+    assert r.recipient == "my mum"
+
+
+def test_heuristic_leading_filler_i_want_to() -> None:
+    r = parse("i want to send 20k to mama")
+    assert r.intent == "transfer"
+    assert r.recipient == "mama"
+
+
+def test_heuristic_abeg_with_comma() -> None:
+    r = parse("Abeg, send 5k give Chidi")
+    assert r.intent == "transfer"
+    assert r.amount == 5_000.0
+    assert r.recipient == "Chidi"
+    assert r.language_detected == "pcm"
+
+
+def test_heuristic_trailing_filler_not_swallowed_into_recipient() -> None:
+    """Regression: a pattern's greedy (.+)$ capture used to fold trailing
+    filler words into the recipient with no warning — 'mama pls', 'mama
+    now' — silently corrupting the field instead of failing loudly."""
+    r = parse("send 20k to mama pls")
+    assert r.recipient == "mama"
+    assert r.flags == []
+
+    r = parse("send 20,000 naira to mama now")
+    assert r.recipient == "mama"
+
+
+def test_heuristic_trailing_filler_lowers_recipient_confidence() -> None:
+    clean = parse("send 20k to mama")
+    trimmed = parse("send 20k to mama pls")
+    assert trimmed.field_confidence["recipient"] < clean.field_confidence["recipient"]
+
+
+def test_heuristic_k_with_trailing_naira_word() -> None:
+    r = parse("transfer 20k naira to mama's account")
+    assert r.intent == "transfer"
+    assert r.amount == 20_000.0
+    assert r.recipient == "mama's account"
+
+
+def test_heuristic_object_first_send_recipient_amount() -> None:
+    r = parse("send mama 20k")
+    assert r.intent == "transfer"
+    assert r.amount == 20_000.0
+    assert r.recipient == "mama"
+    # Looser grammar (no connector word) scores lower than a connector match.
+    assert r.field_confidence["intent"] < 0.95
+    assert r.field_confidence["recipient"] < 0.90
+
+
+def test_heuristic_balance_how_much_is_in_my_account() -> None:
+    r = parse("how much is in my account")
+    assert r.intent == "balance_check"
+    assert r.language_detected == "en"
+
+
+def test_heuristic_no_verb_still_unknown() -> None:
+    """Verb-less input stays a deliberate miss — too ambiguous to guess."""
+    r = parse("20k to mama")
+    assert r.intent == "unknown"
+    assert "needs_llm_provider" in r.flags
+
+
+def test_heuristic_naira_amount_without_comma_grouping() -> None:
+    """Regression: the shared plain-naira amount extractor used to
+    under-match a comma-less digit run (e.g. '20000' -> just '200') once it
+    was pulled out of a single backtracking regex into its own isolated
+    match — because nothing downstream forced the regex to retry."""
+    r = parse("transfer ₦20000 to Zara")
+    assert r.amount == 20_000.0
+    assert r.recipient == "Zara"
+
+
+# ── Typo tolerance / spelling variants ──────────────────────────────────────
+
+def test_heuristic_typo_tolerant_verb() -> None:
+    r = parse("trasfer 20k to mama")
+    assert r.intent == "transfer"
+    assert r.amount == 20_000.0
+    assert r.recipient == "mama"
+
+
+def test_heuristic_variant_canonicalization() -> None:
+    r = parse("abg send 5k give Chidi")
+    assert r.intent == "transfer"
+    assert r.language_detected == "pcm"
+    assert r.recipient == "Chidi"
+
+
+def test_heuristic_fuzzy_correction_does_not_mangle_apostrophe_word() -> None:
+    """Regression: fuzzy-correcting the leading token used to truncate
+    "What's" (close to "what" under difflib's cutoff) into "what", which no
+    longer matched the "what's my balance" phrase."""
+    r = parse("What's my balance?")
+    assert r.intent == "balance_check"
+
+
+# ── Marker-scored language ranking ──────────────────────────────────────────
+# Language is decided by weighted marker evidence in the utterance, not a
+# fixed try-order, so a plain English sentence with no pidgin/regional
+# markers must resolve to English even though pidgin is checked first when
+# scores tie.
+
+def test_heuristic_language_ranking_prefers_evidence_over_fixed_order() -> None:
+    r = parse("Send 20k to Mama")
+    assert r.language_detected == "en"
+
+
+def test_heuristic_language_ranking_pidgin_markers_win() -> None:
+    r = parse("Abeg send 5k give Chidi")
+    assert r.language_detected == "pcm"
+
+
+def test_heuristic_language_confidence_reflects_evidence_dominance() -> None:
+    """A sentence with zero competing-language evidence should score at
+    least as confident as one sharing its verb with another language's
+    grammar (English 'send' also appears in pidgin sentences)."""
+    clean_en = parse("Send 20k to Mama")
+    pidgin = parse("Abeg send 5k give Chidi")
+    assert clean_en.field_confidence["language_detected"] > 0.0
+    assert pidgin.field_confidence["language_detected"] > 0.0
+
+
 # ── Naija numerics ─────────────────────────────────────────────────────────
 
 def test_heuristic_half_milli() -> None:

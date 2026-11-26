@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] — 2026-11-26
+
 ### Changed
 
 - **The offline parser no longer accepts an unclear recipient.** "send 5k to
@@ -22,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provider replies are validated: unusable values are dropped, scored 0.0 and
   flagged `invalid_<field>`. A reply with no valid intent is now `unknown`
   (a missing intent used to become `balance_check`).
+- The README, contributing guide and security policy now match the library's
+  behaviour, with new safety and privacy notes.
 
 ### Fixed
 
@@ -29,13 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JSON, non-text output) no longer crash `parse()`.
 - Long runs of spaces and commas no longer stall the parser for seconds.
 - Yoruba and Igbo text typed with separate combining accents now parses.
-
-- **Heuristic silently corrupted the recipient on any trailing word.** Every
-  transfer pattern's `(.+)$` capture ran to the end of the string, so filler
-  after the name — "send 20k to mama **pls**", "...mama **now**" — became part
-  of `recipient` with no flag and high confidence. Trailing filler (`pls`,
-  `please`, `now`, `abeg`, `sha`, `jare`, `biko`) is now trimmed before the
-  recipient is returned.
 - **A misspelled verb after "abeg" was never corrected.** Typo correction only
   looked at the first token, so "abg trasfer 20k to mama pls" fell through to
   `unknown`. The verb after "abeg" is now corrected to "send" or "transfer".
@@ -52,6 +51,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Igbo number-word amounts: "puku" (thousand) or "nde" (million) followed by
   one multiplier from 1 to 10, with or without dots below. Compound figures
   ("puku iri abụọ") are still left to a provider.
+
+---
+
+## [0.4.0] — 2026-09-22
+
+### Fixed
+
+- **Heuristic silently corrupted the recipient on any trailing word.** Every
+  transfer pattern's `(.+)$` capture ran to the end of the string, so filler
+  after the name — "send 20k to mama **pls**", "...mama **now**" — became part
+  of `recipient` with no flag and high confidence. Trailing filler (`pls`,
+  `please`, `now`, `abeg`, `sha`, `jare`, `biko`) is now trimmed before the
+  recipient is returned.
+
+### Added
+
 - The heuristic strips common leading filler/politeness phrases ("hey",
   "pls", "can you", "i want to", "kindly") before matching, so natural
   phrasing like "hey abeg send 20k to mama" or "can you send 20k to my mum"

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import difflib
 import json
+import math
 import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -13,8 +15,14 @@ from owo.schema import Intent, Language, OwoResult
 # Normalization
 # ---------------------------------------------------------------------------
 
+# A money instruction is a short sentence. Anything longer is left to a
+# provider, which also bounds the work the patterns below can be made to do.
+_MAX_INPUT_CHARS = 500
+
+
 def _normalize_heuristic_input(text: str) -> str:
-    t = text.strip()
+    # Compose accents, so "ụ" typed as "u" plus a combining dot still matches.
+    t = unicodedata.normalize("NFC", text).strip()
     t = (
         t.replace("’", "'")
         .replace("‘", "'")
@@ -96,33 +104,71 @@ _KNOWN_LEAD_TOKENS: frozenset[str] = frozenset({
 })
 
 
+# Real words close enough to a transfer verb to clear the similarity cutoff
+# below. Correcting any of these would turn an unrelated sentence into a
+# transfer, so they are never treated as typos. Add to this list whenever a
+# verb is added to the vocabulary.
+_NOT_TYPOS: frozenset[str] = frozenset({
+    # near "send"
+    "ascend", "end", "resend", "scend", "scends", "second", "secund",
+    "sensed", "shend", "shends", "shrend", "spend", "spends", "stend",
+    "stends", "upsend",
+    # near "transfer"
+    "protransfer", "retransfer", "retransfers", "strafer", "trainer",
+    "trainster", "tranker", "transfeature", "transform", "transformer",
+    "transformers", "transfuge", "transfuse", "transfuser", "transfusers",
+    "transiter", "transpeer", "transvert", "tranter",
+    # near "ran", "fi", "aika" and "ziga"
+    "an", "bran", "cran", "kran", "rain", "raun", "roan", "uran", "wran",
+    "fei",
+    "aka", "haikai", "haikal", "kawika",
+    "ziega", "zigzag",
+})
+
+
+def _correct_typo(token: str, vocabulary: frozenset[str]) -> str:
+    """Return the vocabulary word `token` is a likely typo of, else `token`
+    unchanged (stdlib difflib, no model)."""
+    lowered = token.lower()
+    # Punctuation is ignored here so "spend," is still recognised as "spend".
+    if lowered in vocabulary or re.sub(r"^\W+|\W+$", "", lowered) in _NOT_TYPOS:
+        return token
+    # A token like "what's" or "checking" already contains/extends a known
+    # word — that's not a typo, leave it alone rather than truncating it.
+    if any(lowered.startswith(v) or v.startswith(lowered) for v in vocabulary):
+        return token
+    matches = difflib.get_close_matches(lowered, vocabulary, n=1, cutoff=0.8)
+    return matches[0] if matches else token
+
+
 def _fuzzy_correct_leading_token(text: str) -> str:
     """Typo-correct the leading token against the known verb/marker
-    vocabulary (stdlib difflib, no model). Scoped to one token so a
-    correction can't silently rewrite the rest of the sentence."""
+    vocabulary. Scoped to one token so a correction can't silently rewrite
+    the rest of the sentence."""
     m = re.match(r"^(\S+)(\s*.*)$", text, re.DOTALL)
     if not m:
         return text
     first, rest = m.group(1), m.group(2)
-    lowered = first.lower()
-    if lowered in _KNOWN_LEAD_TOKENS:
+    return _correct_typo(first, _KNOWN_LEAD_TOKENS) + rest
+
+
+# The only verbs the pidgin grammar accepts after "abeg".
+_PCM_VERBS: frozenset[str] = frozenset({"send", "transfer"})
+
+
+def _fuzzy_correct_verb_after_abeg(text: str) -> str:
+    """Typo-correct the verb in 'abeg <verb> ...', where the leading token is
+    the pidgin marker and the verb would otherwise never be looked at."""
+    m = re.match(r"(?i)^(abeg\s+)(\S+)(.*)$", text, re.DOTALL)
+    if not m:
         return text
-    # A token like "what's" or "checking" already contains/extends a known
-    # word — that's not a typo, leave it alone rather than truncating it.
-    if any(lowered.startswith(v) or v.startswith(lowered) for v in _KNOWN_LEAD_TOKENS):
-        return text
-    matches = difflib.get_close_matches(lowered, _KNOWN_LEAD_TOKENS, n=1, cutoff=0.8)
-    if not matches:
-        return text
-    return matches[0] + rest
+    marker, verb, rest = m.groups()
+    return marker + _correct_typo(verb, _PCM_VERBS) + rest
 
 
 # Trailing particles/politeness words common in Nigerian speech that have no
 # place in a recipient name ("send 20k to mama now", "send 20k to mama pls").
-_TRAILING_FILLERS = ("please", "pls", "plz", "abeg", "now", "jare", "sha", "biko")
-_TRAILING_FILLER_RE = re.compile(
-    r"(?i)(?:[\s,]+(?:" + "|".join(_TRAILING_FILLERS) + r")\b)+\s*[.,!]*$"
-)
+_TRAILING_FILLERS = frozenset({"please", "pls", "plz", "abeg", "now", "jare", "sha", "biko"})
 
 
 def _trim_recipient_tail(raw: str) -> tuple[str, bool]:
@@ -130,12 +176,17 @@ def _trim_recipient_tail(raw: str) -> tuple[str, bool]:
 
     A pattern's `(.+)$` capture takes everything to the end of the string, so
     without this, "send 20k to mama pls" silently becomes recipient='mama
-    pls'. Returns (name, was_trimmed); if the whole tail was filler, the
-    untrimmed text is kept rather than emptying the recipient.
+    pls'. Returns (name, was_trimmed); if the whole tail was filler, it is
+    returned as is for the recipient check to reject.
     """
-    base = raw.strip().rstrip(",.").strip()
-    trimmed = _TRAILING_FILLER_RE.sub("", raw).strip().rstrip(",.").strip()
-    return (trimmed or base), bool(trimmed) and trimmed != base
+    tail = raw.strip().rstrip(" ,.!")
+    was_trimmed = False
+    while True:
+        cut = max(tail.rfind(" "), tail.rfind(","))
+        if cut < 0 or tail[cut + 1:].casefold() not in _TRAILING_FILLERS:
+            return tail, was_trimmed
+        tail = tail[:cut].rstrip(" ,.!")
+        was_trimmed = True
 
 
 def _parse_plain_amount(digits: str) -> float:
@@ -143,7 +194,83 @@ def _parse_plain_amount(digits: str) -> float:
 
 
 def _clean_recipient(name: str) -> str:
-    return name.strip().rstrip(",.").strip()
+    return name.strip().rstrip(",.!").strip()
+
+
+# ---------------------------------------------------------------------------
+# Recipient check
+# ---------------------------------------------------------------------------
+# The grammars capture everything after the connector. That is only a recipient
+# if nothing else came along with it ("tomorrow", "and 3k to Ada", "no, don't"),
+# so the capture must look like a name or it is handed to a provider. This errs
+# towards handing over: a wrong recipient costs far more than a missed parse.
+
+_MAX_RECIPIENT_WORDS = 4
+# Words that show the capture holds more than a name.
+_NOT_NAME_WORDS: frozenset[str] = frozenset("""
+    and or if but then so because when after before until unless only also again
+    instead actually make for from to on at in with via using through by of the
+    not no don't dont do never cancel stop wait go
+    tomorrow today tonight yesterday later next week month every each weekly
+    monthly daily now quick quickly fast soon immediately urgent urgently asap
+    morning afternoon evening night fees
+    him her them me us it you myself someone somebody anyone everyone everybody
+    nobody none nothing
+    send transfer pay buy money naira rent bank account acct number
+    please pls plz abeg kindly thanks thank jare sha biko
+    wey dey den una
+    gobe yau yanzu anjima da ko kada kar idan kafin bayan aika mika
+    ati àti tabi tàbí maṣe máṣe sugbon ṣugbọn loni lónìí lọla lọ́la bayi báyìí fun
+    echi taa na ma maka mana maọbụ maobu ọbụrụ oburu ugbu kwa zipu zipụ ziga
+""".split())
+# Titles that may precede a name written in any case.
+_TITLES: frozenset[str] = frozenset({
+    "uncle", "aunty", "auntie", "oga", "madam", "mr", "mrs", "miss", "dr",
+    "chief", "alhaji", "alhaja", "mallam", "pastor", "engr",
+})
+# Relations that may follow "my".
+_RELATIONS: frozenset[str] = frozenset({
+    "mum", "mom", "mother", "mama", "dad", "father", "papa", "wife", "husband",
+    "son", "daughter", "brother", "sister", "friend", "boss", "landlord",
+    "landlady", "uncle", "aunty", "auntie", "oga",
+})
+
+
+def _is_name_word(word: str) -> bool:
+    if word.endswith("."):  # only initials and titles keep a full stop
+        word = word[:-1]
+        if len(word) != 1 and word.casefold() not in _TITLES:
+            return False
+    if not word or not word[0].isalpha() or word in ("a", "o"):
+        return False
+    # Letters and combining marks, plus apostrophes and hyphens inside a name.
+    return all(c in "'-" or unicodedata.category(c)[0] in "LM" for c in word)
+
+
+def _is_clean_recipient(name: str) -> bool:
+    words = name.split()
+    if words and words[-1].casefold() in ("account", "acct"):
+        words = words[:-1]  # "mama's account"
+    if not 1 <= len(words) <= _MAX_RECIPIENT_WORDS:
+        return False
+    keys = [w.casefold().rstrip(".") for w in words]
+    parts = keys + [part for key in keys for part in key.split("-")]  # "Chidi-not-today"
+    if not all(_is_name_word(w) for w in words) or _NOT_NAME_WORDS.intersection(parts):
+        return False
+    # A bank named without the comma form can't be safely split from the name.
+    if _BANK_NAMES.intersection(keys + [f"{a} {b}" for a, b in zip(keys, keys[1:], strict=False)]):
+        return False
+    if len(words) == 1:
+        return True
+    capitalised = [w[0].isupper() for w in words]
+    if keys[0] == "my":
+        relation = keys[1].removesuffix("'s") in _RELATIONS
+        return (relation or capitalised[1]) and all(capitalised[2:])
+    if keys[0] in _TITLES:
+        return all(capitalised[2:])
+    # Several words are a full name only when each is capitalised, and capitals
+    # say nothing if the whole phrase is shouted.
+    return all(capitalised) and not name.isupper()
 
 
 # ---------------------------------------------------------------------------
@@ -177,9 +304,30 @@ _AMOUNT_CONF_EXPLICIT = 0.97  # "20k", "₦5,000", "dubu 10"
 _AMOUNT_CONF_WORD = 0.90  # "half a milli", "dubu goma"
 # A field the pattern expected but could not fill.
 _AMOUNT_CONF_MISSING = 0.20
-_RECIPIENT_CONF_MISSING = 0.20
 # At or below this score a field is treated as absent and gets a missing_* flag.
 _MISSING_THRESHOLD = 0.50
+
+
+def _unknown_result(
+    *reasons: str,
+    language: Language = Language.ENGLISH,
+    lang_conf: float = 0.30,
+    raw: dict[str, Any] | None = None,
+) -> OwoResult:
+    """A result with nothing to act on, marked for a provider to handle."""
+    return OwoResult(
+        intent=Intent.UNKNOWN,
+        amount=None,
+        currency="NGN",
+        recipient=None,
+        account_number=None,
+        bank=None,
+        service=None,
+        language_detected=language,
+        field_confidence={"intent": 0.20, "language_detected": lang_conf},
+        flags=["needs_llm_provider", *reasons],
+        raw={"parser": "heuristic", "pattern": "fallback", **(raw or {})},
+    )
 
 
 def _transfer_result(
@@ -197,13 +345,26 @@ def _transfer_result(
     name, bank = _extract_bank(trimmed_recipient)
     clean_name = _clean_recipient(name)
 
+    problem = None
+    if amount is not None and not (math.isfinite(amount) and amount > 0):
+        problem = "invalid_amount"
+    elif not _is_clean_recipient(clean_name):
+        problem = "ambiguous_recipient"
+    if problem:
+        return _unknown_result(
+            problem,
+            language=language,
+            lang_conf=lang_conf,
+            raw={"pattern": pattern, "unparsed_recipient": trimmed_recipient},
+        )
+
     # A trimmed tail is still a clean extraction, just a slightly less
     # certain one than a capture with no trailing junk at all.
     recipient_score = recipient_conf - 0.05 if was_trimmed else recipient_conf
 
     field_confidence = {
         "intent": intent_conf,
-        "recipient": recipient_score if clean_name else _RECIPIENT_CONF_MISSING,
+        "recipient": recipient_score,
         "language_detected": lang_conf,
         "amount": amount_conf if amount is not None else _AMOUNT_CONF_MISSING,
     }
@@ -212,17 +373,13 @@ def _transfer_result(
 
     # Flags are derived from the same scores, so a flag and its field's
     # confidence can never disagree.
-    flags = [
-        f"missing_{fld}"
-        for fld in ("amount", "recipient")
-        if field_confidence[fld] <= _MISSING_THRESHOLD
-    ]
+    flags = ["missing_amount"] if field_confidence["amount"] <= _MISSING_THRESHOLD else []
 
     return OwoResult(
         intent=Intent.TRANSFER,
         amount=amount,
         currency="NGN",
-        recipient=clean_name or None,
+        recipient=clean_name,
         account_number=None,
         bank=bank,
         service=None,
@@ -330,6 +487,36 @@ def _extract_amount_dubu_n(rest: str) -> tuple[float, float, str] | None:
     return float(m.group(1)) * 1000, _AMOUNT_CONF_EXPLICIT, rest[m.end():]
 
 
+# Igbo puts the multiplier after the scale word: "puku ise" is 5,000 and
+# "nde ise" is 5,000,000. Only a single multiplier word is read; compounds
+# ("puku iri abụọ") leave words behind, so the connector check rejects them
+# instead of returning part of the figure.
+_IG_SCALE_WORDS: dict[str, int] = {"puku": 1_000, "nde": 1_000_000}
+_IG_NUM_WORDS: dict[str, int] = {
+    "otu": 1,
+    "abụọ": 2, "abuo": 2,
+    "atọ": 3, "ato": 3,
+    "anọ": 4, "ano": 4,
+    "ise": 5,
+    "isii": 6,
+    "asaa": 7,
+    "asatọ": 8, "asato": 8,
+    "itoolu": 9,
+    "iri": 10,
+}
+
+
+def _extract_amount_ig_word(rest: str) -> tuple[float, float, str] | None:
+    m = re.match(r"(?i)^(puku|nde)\s+(\w+)\s*", rest)
+    if not m:
+        return None
+    multiplier = _IG_NUM_WORDS.get(m.group(2).lower())
+    if multiplier is None:
+        return None
+    amount = float(_IG_SCALE_WORDS[m.group(1).lower()] * multiplier)
+    return amount, _AMOUNT_CONF_WORD, rest[m.end():]
+
+
 _EN_AMOUNT_SHAPES: tuple[_AmountShape, ...] = (
     _extract_amount_k,
     _extract_amount_plain,
@@ -344,6 +531,7 @@ _HA_AMOUNT_SHAPES: tuple[_AmountShape, ...] = (
 _IG_AMOUNT_SHAPES: tuple[_AmountShape, ...] = (
     _extract_amount_k,
     _extract_amount_plain,
+    _extract_amount_ig_word,
 )
 
 
@@ -585,10 +773,13 @@ def _language_confidence(scores: dict[Language, float], language: Language) -> f
 
 def heuristic_parse(text: str) -> OwoResult:
     """Rule-based parse covering common patterns across all five languages."""
+    if len(text) > _MAX_INPUT_CHARS:
+        return _unknown_result("input_too_long")
     t = _normalize_heuristic_input(text)
     t = _canonicalize_variants(t)
     t = _strip_leading_filler(t)
     t = _fuzzy_correct_leading_token(t)
+    t = _fuzzy_correct_verb_after_abeg(t)
 
     scores = _score_languages(t)
     ranked = _ranked_languages(scores)
@@ -624,19 +815,7 @@ def heuristic_parse(text: str) -> OwoResult:
                 language, _language_confidence(scores, language), pattern=f"{language.value}_balance",
             )
 
-    return OwoResult(
-        intent=Intent.UNKNOWN,
-        amount=None,
-        currency="NGN",
-        recipient=None,
-        account_number=None,
-        bank=None,
-        service=None,
-        language_detected=Language.ENGLISH,
-        field_confidence={"intent": 0.20, "language_detected": 0.30},
-        flags=["needs_llm_provider"],
-        raw={"parser": "heuristic", "pattern": "fallback"},
-    )
+    return _unknown_result()
 
 
 # ---------------------------------------------------------------------------
@@ -682,6 +861,31 @@ def _clamp01(value: float) -> float:
     return 0.0 if value < 0.0 else 1.0 if value > 1.0 else value
 
 
+def _finite_float(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+_PLAIN_NUMBER_RE = re.compile(r"(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?")
+_PROVIDER_TEXT_FIELDS = ("recipient", "account_number", "bank", "service")
+
+
+def _provider_amount(value: Any) -> float | None:
+    """A positive, finite number, or a string that is nothing but one."""
+    if isinstance(value, str):
+        text = value.strip()
+        if not _PLAIN_NUMBER_RE.fullmatch(text):
+            return None
+        value = text.replace(",", "")
+    elif isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = _finite_float(value)
+    return number if number is not None and number > 0 else None
+
+
 def _coerce_field_confidence(data: dict[str, Any]) -> dict[str, float]:
     """Pull ``field_confidence`` out of provider JSON, tolerant of shape.
 
@@ -693,27 +897,45 @@ def _coerce_field_confidence(data: dict[str, Any]) -> dict[str, float]:
     scored: dict[str, float] = {}
     if isinstance(raw, dict):
         for key, val in raw.items():
-            try:
-                scored[str(key)] = _clamp01(float(val))
-            except (TypeError, ValueError):
-                continue
+            number = _finite_float(val)
+            if number is not None:
+                scored[str(key)] = _clamp01(number)
         if scored:
             return scored
 
-    legacy = data.get("confidence")
+    legacy = _finite_float(data.get("confidence"))
     if legacy is not None:
-        try:
-            flat = _clamp01(float(legacy))
-        except (TypeError, ValueError):
-            return scored
+        flat = _clamp01(legacy)
         for key in _PROVIDER_SCORED_FIELDS:
             if data.get(key) is not None:
                 scored[key] = flat
     return scored
 
 
+def _bad_provider_result(payload: object, source_text: str) -> OwoResult:
+    return OwoResult(
+        intent=Intent.UNKNOWN,
+        amount=None,
+        currency="NGN",
+        recipient=None,
+        account_number=None,
+        bank=None,
+        service=None,
+        language_detected=Language.ENGLISH,
+        field_confidence={},
+        flags=["bad_provider_output"],
+        raw={"parser": "provider", "source_text": source_text, "raw_output": payload},
+    )
+
+
 def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
-    """Parse JSON from an LLM provider into :class:`OwoResult`."""
+    """Parse JSON from an LLM provider into :class:`OwoResult`.
+
+    The reply is untrusted. A value of the wrong type or out of range is
+    dropped, scored 0.0 and reported as an ``invalid_<field>`` flag.
+    """
+    if not isinstance(payload, str):
+        return _bad_provider_result(payload, source_text)
     text = payload.strip()
     if text.startswith("```"):
         lines = text.splitlines()
@@ -724,43 +946,62 @@ def result_from_provider_json(payload: str, source_text: str) -> OwoResult:
         text = "\n".join(lines).strip()
 
     try:
-        data: dict[str, Any] = json.loads(text)
-    except (json.JSONDecodeError, ValueError):
-        return OwoResult(
-            intent=Intent.UNKNOWN,
-            amount=None,
-            currency="NGN",
-            recipient=None,
-            account_number=None,
-            bank=None,
-            service=None,
-            language_detected=Language.ENGLISH,
-            field_confidence={},
-            flags=["bad_provider_output"],
-            raw={"parser": "provider", "source_text": source_text, "raw_output": payload},
-        )
+        data: Any = json.loads(text)
+    except (ValueError, RecursionError):
+        return _bad_provider_result(payload, source_text)
+    if not isinstance(data, dict):
+        return _bad_provider_result(payload, source_text)
+
     flags = data.get("flags") or []
     if isinstance(flags, str):
         flags = [flags]
-    raw_intent = data.get("intent")
+    if not isinstance(flags, list) or not all(isinstance(f, str) for f in flags):
+        flags = ["bad_provider_output"]
+    flags = list(flags)
+    invalid: list[str] = []
+    values: dict[str, Any] = {}
+
     try:
-        intent = Intent(raw_intent) if raw_intent is not None else Intent.BALANCE_CHECK
-    except ValueError:
+        intent = Intent(data.get("intent"))
+    except (TypeError, ValueError):
         intent = Intent.UNKNOWN
+        invalid.append("intent")
+        flags.append("bad_provider_output")
+    values["intent"] = None if "intent" in invalid else intent
+
+    raw_amount = data.get("amount")
+    values["amount"] = None if raw_amount is None else _provider_amount(raw_amount)
+    if raw_amount is not None and values["amount"] is None:
+        invalid.append("amount")
+        flags.append("invalid_amount")
+
+    for name in (*_PROVIDER_TEXT_FIELDS, "currency"):
+        value = data.get(name)
+        if value is None or isinstance(value, str):
+            values[name] = (value or "").strip() or None
+        else:
+            values[name] = None
+            invalid.append(name)
+            flags.append(f"invalid_{name}")
+
     try:
-        language = Language(data.get("language_detected") or Language.ENGLISH)
-    except ValueError:
+        language = Language(data.get("language_detected"))
+    except (TypeError, ValueError):
         language = Language.ENGLISH
+
+    field_confidence = _coerce_field_confidence({**data, **values})
+    field_confidence.update(dict.fromkeys(invalid, 0.0))
+
     return OwoResult(
         intent=intent,
-        amount=data.get("amount"),
-        currency=str(data.get("currency") or "NGN"),
-        recipient=data.get("recipient"),
-        account_number=data.get("account_number"),
-        bank=data.get("bank"),
-        service=data.get("service"),
+        amount=values["amount"],
+        currency=values["currency"] or "NGN",
+        recipient=values["recipient"],
+        account_number=values["account_number"],
+        bank=values["bank"],
+        service=values["service"],
         language_detected=language,
-        field_confidence=_coerce_field_confidence(data),
-        flags=list(flags),
+        field_confidence=field_confidence,
+        flags=list(dict.fromkeys(flags)),
         raw={"parser": "provider", "source_text": source_text, "llm": data},
     )

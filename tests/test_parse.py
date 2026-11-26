@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from owo import BaseProvider, parse
 
 # ── English ────────────────────────────────────────────────────────────────
@@ -200,6 +202,63 @@ def test_heuristic_fuzzy_correction_does_not_mangle_apostrophe_word() -> None:
     assert r.intent == "balance_check"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "abg trasfer 20k to mama pls",
+        "abeg trasfer 20k give mama",
+        "Abeg, trasfer 20k to mama",
+    ],
+)
+def test_heuristic_typo_tolerant_verb_after_abeg(text: str) -> None:
+    """Regression: only the first token was typo-corrected, so a leading
+    'abeg' hid a misspelled verb from the corrector."""
+    r = parse(text)
+    assert r.intent == "transfer"
+    assert r.amount == 20_000.0
+    assert r.recipient == "mama"
+    assert r.language_detected == "pcm"
+
+
+@pytest.mark.parametrize("word", ["spend", "second", "ascend", "end", "transform"])
+def test_heuristic_real_word_after_abeg_not_corrected_to_a_verb(word: str) -> None:
+    """These are close enough to 'send'/'transfer' to clear the similarity
+    cutoff, but they are real words and must not start a transfer."""
+    r = parse(f"abeg {word} 20k give mama")
+    assert r.intent == "unknown"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "spend 20k to mama",
+        "Spend 20k to mama",
+        "spends 20k to mama",
+        "spend, 20k to mama",
+        "i want to spend 20k to mama",
+        "ascend 20k to mama",
+        "end 20k to mama",
+        "second 20k to mama",
+        "transform 20k to mama",
+        "rain 20k si Mama",
+        "zigzag ego 5k nye Emeka",
+    ],
+)
+def test_heuristic_real_word_not_corrected_to_a_transfer_verb(text: str) -> None:
+    """Regression: "spend 20k to mama" was typo-corrected to "send" and
+    returned as a high-confidence transfer."""
+    r = parse(text)
+    assert r.intent == "unknown"
+    assert "needs_llm_provider" in r.flags
+
+
+@pytest.mark.parametrize("verb", ["trasfer", "trnsfer", "snd", "sennd"])
+def test_heuristic_genuine_verb_typos_still_corrected(verb: str) -> None:
+    r = parse(f"{verb} 20k to mama")
+    assert r.intent == "transfer"
+    assert r.amount == 20_000.0
+
+
 # ── Marker-scored language ranking ──────────────────────────────────────────
 # Language is decided by weighted marker evidence in the utterance, not a
 # fixed try-order, so a plain English sentence with no pidgin/regional
@@ -258,11 +317,13 @@ def test_heuristic_bank_extraction_pcm() -> None:
     assert r.language_detected == "pcm"
 
 
-def test_heuristic_unknown_bank_kept_in_recipient() -> None:
-    # Unrecognised bank name stays part of the recipient string.
+def test_heuristic_unknown_bank_is_handed_over() -> None:
+    # An unrecognised bank is not folded into the recipient name.
     r = parse("Send 5k to Ada, RandomBank99")
-    assert "RandomBank99" in (r.recipient or "")
+    assert r.recipient is None
     assert r.bank is None
+    assert "ambiguous_recipient" in r.flags
+    assert r.raw["unparsed_recipient"] == "Ada, RandomBank99"
 
 
 # ── Pidgin (pcm) ───────────────────────────────────────────────────────────
@@ -372,6 +433,38 @@ def test_heuristic_ig_ziga_naira() -> None:
     assert r.intent == "transfer"
     assert r.amount == 10_000.0
     assert r.language_detected == "ig"
+
+
+@pytest.mark.parametrize(
+    ("words", "amount"),
+    [
+        ("nde ise", 5_000_000.0),
+        ("nde abụọ", 2_000_000.0),
+        ("puku ise", 5_000.0),
+        ("puku abuo", 2_000.0),
+        ("puku iri", 10_000.0),
+    ],
+)
+def test_heuristic_ig_number_words(words: str, amount: float) -> None:
+    r = parse(f"Zipụ ego {words} nye Emeka")
+    assert r.intent == "transfer"
+    assert r.amount == amount
+    assert r.recipient == "Emeka"
+    assert r.language_detected == "ig"
+    assert r.field_confidence["amount"] == 0.90
+    assert r.flags == []
+
+
+@pytest.mark.parametrize(
+    "words",
+    ["puku iri abụọ", "puku iri na ise", "nde ise puku iri", "puku nde"],
+)
+def test_heuristic_ig_compound_number_is_not_partially_read(words: str) -> None:
+    """Compound amounts aren't supported. They must fall through to a
+    provider rather than return only the first part of the figure."""
+    r = parse(f"Zipụ ego {words} nye Emeka")
+    assert r.intent == "unknown"
+    assert r.amount is None
 
 
 def test_heuristic_ig_balance() -> None:

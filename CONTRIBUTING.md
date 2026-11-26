@@ -6,7 +6,8 @@ Thank you for helping improve **owo**, the Nigerian-language financial intent pa
 
 - **Eval fixtures** in **Yoruba**, **Hausa**, and **Igbo** — high-quality, realistic phrases are hard to source; curated examples materially improve quality.
 - **Edge cases** for code-switching and Naija numerics (`5k`, `half a milli`, bank names, meter numbers, etc.).
-- **Bug reports** with the exact input string, provider/model (if not default), and what you expected vs. what you got.
+- **Native-speaker review** of the Pidgin, Hausa, Yoruba and Igbo word lists (see below).
+- **Bug reports** with the exact input string, the provider/model if you passed one, and what you expected vs. what you got.
 
 ---
 
@@ -49,9 +50,9 @@ Each fixture should tie a **single user utterance** to **expected structured fie
 ```yaml
 id: transfer_pidgin_001
 input: "Abeg send 5k to Chidi, GTBank"
-language_hint: pcm          # optional; omit to rely on detector
 expected:
   intent: transfer
+  language_detected: pcm
   amount: 5000
   currency: NGN
   recipient: Chidi
@@ -76,7 +77,9 @@ expected:
     - missing_amount
 ```
 
-Use the same field names the library exposes (`intent`, `amount`, `currency`, `recipient`, `account_number`, `bank`, `service`, `flags`, etc.). Valid `intent` values include `unknown` when asserting heuristic fallback or unresolved input. If the eval runner compares only a subset of fields, document that in the fixture directory README when it exists.
+Use the same field names the library exposes (`intent`, `amount`, `currency`, `recipient`, `account_number`, `bank`, `service`, `flags`, etc.). Valid `intent` values include `unknown` when asserting heuristic fallback or unresolved input. Only the fields you list under `expected` are compared.
+
+For input the offline rules don't handle (bill payments, airtime, data, crypto), add `requires_provider: true`. The runner skips those fixtures unless you pass `--provider module:ClassName`.
 
 ### Conventions
 
@@ -87,23 +90,33 @@ Use the same field names the library exposes (`intent`, `amount`, `currency`, `r
 
 ### Where to put files
 
-Ship eval YAML fixtures under **`src/owo/eval/fixtures/`** (see the sample file
-there). Unit tests live in **`tests/`**. If you are unsure where a new corpus
-belongs, open an issue or note it in your PR description.
+Ship eval YAML fixtures under **`src/owo/eval/fixtures/`** (see the files
+there; each holds one fixture or a list). Unit tests live in **`tests/`**. If you
+are unsure where a new corpus belongs, open an issue or note it in your PR
+description.
 
 ---
 
-## Language normalization maps
+## Word lists and normalization maps
 
-Some preprocessing (digits, currency symbols, common abbreviations, tone-insensitive variants) may live in **normalization maps** per language (`en`, `pcm`, `yo`, `ha`, `ig`).
+The offline rules and their word lists live in [`src/owo/_heuristic.py`](./src/owo/_heuristic.py):
 
-When adding or editing a map:
+| Name | What it holds |
+| ---- | ------------- |
+| `_VARIANT_MAP` | Texting abbreviations and their full spelling |
+| `_LANGUAGE_MARKERS` | Weighted words that identify each language |
+| `_HA_NUM_WORDS`, `_IG_NUM_WORDS` | Number words used in amounts |
+| `_TRAILING_FILLERS` | Words trimmed from the end of a recipient |
+| `_NOT_NAME_WORDS` | Words showing that captured text is more than a name |
+| `_TITLES`, `_RELATIONS` | Words that can introduce a recipient ("Uncle", "my mum") |
+| `_NOT_TYPOS` | Real words that must never be corrected into a transfer verb |
 
-1. Prefer **small, reversible** normalizations — do not destroy information the model needs (e.g. do not strip all punctuation if it disambiguates amounts).
-2. Add a **fixture** that proves the normalization helps (or that the model resolves the phrase correctly without harmful side effects).
-3. Document **non-obvious** mappings in a comment or in `notes` on the related fixture.
+When adding or editing one:
 
-If the project exposes a specific module path for maps, mirror existing naming and register new entries the same way neighboring languages do.
+1. Prefer **small, narrow** changes — a payment parser should hand a sentence to a provider rather than guess.
+2. Add a **fixture** or test showing the change helps. For amount or recipient rules, also test what must still be handed over (see `tests/test_safety.py`).
+3. Document **non-obvious** entries in a comment or in `notes` on the related fixture.
+4. If you add a transfer verb, add the real words close to it to `_NOT_TYPOS`.
 
 ---
 
@@ -133,8 +146,11 @@ Include:
 
 - **Exact input string** (copy-paste).
 - **Python version** and **`owo` version** (or commit hash).
-- **Provider/model** if not the default Anthropic setup.
+- **Provider/model**, if you passed one (offline parsing uses none).
 - **Actual JSON** (or redacted `raw`) vs. **expected** behavior.
+
+Replace real names, phone numbers and account numbers with made-up ones. Report
+security problems privately, as described in [SECURITY.md](./SECURITY.md).
 
 ---
 

@@ -10,23 +10,26 @@ Exact support windows may be documented in release notes as the project matures.
 
 If you need to report harassment or other **non-security** conduct concerns and
 prefer not to use a public issue, use GitHub’s reporting tools on the relevant
-comment or profile, or open a **private** vulnerability report with the subject
-`[CoC]` so maintainers can route it appropriately.
+comment or profile, or open a
+[private report](https://github.com/LPMatrix/owo/security/advisories/new) with a
+title starting `[CoC]` so maintainers can route it appropriately.
 
 ## Reporting a vulnerability
 
-**Please do not open a public GitHub issue for security reports.**
+**Please do not post security details in a public GitHub issue.**
 
-Instead, use one of these options:
+[Report a vulnerability privately](https://github.com/LPMatrix/owo/security/advisories/new)
+(on GitHub: **Security → Report a vulnerability**). Include:
 
-1. **GitHub private vulnerability reporting** (preferred): open the repository
-   on GitHub and use **Security → Report a vulnerability** if enabled for this
-   repo.
-2. **Maintainer contact**: email or DM maintainers with subject line
-   `[SECURITY] owo` and include:
-   - Description of the issue and potential impact
-   - Steps to reproduce or a proof-of-concept
-   - Affected versions or commit range, if known
+- a description of the issue and its potential impact;
+- steps to reproduce it, or a proof of concept;
+- affected versions or commit range, if known.
+
+If that page isn't available to you, open a public issue asking the maintainers
+for a private contact, **without any details of the problem**.
+
+A message that makes `owo` return the wrong amount or recipient with no flag is
+worth reporting. Use made-up names and account numbers in your example.
 
 We aim to acknowledge reports within a few business days and coordinate a fix
 and disclosure timeline with you.

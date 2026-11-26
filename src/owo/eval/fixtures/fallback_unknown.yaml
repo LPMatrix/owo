@@ -7,3 +7,11 @@
     flags:
       - needs_llm_provider
   notes: "No offline heuristic — caller should use an LLM provider."
+
+- id: fallback_unknown_002
+  input: "spend 20k to mama"
+  expected:
+    intent: unknown
+    flags:
+      - needs_llm_provider
+  notes: "A real word close to 'send' must not be typo-corrected into a transfer."

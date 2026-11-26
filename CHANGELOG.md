@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The offline parser no longer accepts an unclear recipient.** "send 5k to
+  Chidi tomorrow", "...to Chidi and 3k to Ada" or "...to Chidi? no, don't" used
+  to return the whole tail as the recipient with high confidence. Anything that
+  doesn't look like a name by itself now returns `unknown` with
+  `needs_llm_provider` and `ambiguous_recipient`; the captured text is in
+  `raw["unparsed_recipient"]`. This also applies to account numbers, an
+  unrecognised bank after a comma (previously kept in the recipient), banks
+  written without a comma and several lower-case words.
+- A zero or non-finite offline amount returns `unknown` with `invalid_amount`.
+- Input over 500 characters returns `unknown` with `input_too_long`.
+- Provider replies are validated: unusable values are dropped, scored 0.0 and
+  flagged `invalid_<field>`. A reply with no valid intent is now `unknown`
+  (a missing intent used to become `balance_check`).
+
 ### Fixed
+
+- Malformed provider replies (not an object, non-list `flags`, deeply nested
+  JSON, non-text output) no longer crash `parse()`.
+- Long runs of spaces and commas no longer stall the parser for seconds.
+- Yoruba and Igbo text typed with separate combining accents now parses.
 
 - **Heuristic silently corrupted the recipient on any trailing word.** Every
   transfer pattern's `(.+)$` capture ran to the end of the string, so filler
@@ -15,9 +36,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of `recipient` with no flag and high confidence. Trailing filler (`pls`,
   `please`, `now`, `abeg`, `sha`, `jare`, `biko`) is now trimmed before the
   recipient is returned.
+- **A misspelled verb after "abeg" was never corrected.** Typo correction only
+  looked at the first token, so "abg trasfer 20k to mama pls" fell through to
+  `unknown`. The verb after "abeg" is now corrected to "send" or "transfer".
+- **Typo correction turned real words into transfers.** "spend 20k to mama" was
+  corrected to "send" and returned as a high-confidence transfer; "end",
+  "second", "transform" and Yoruba-path words such as "rain" did the same. A
+  list of real words close to the transfer verbs is now never corrected, so
+  these fall through to `unknown`.
+- **The README's Igbo example fell through to `unknown`.** "Zipụ ego nde ise
+  nye Emeka" now parses as a 5,000,000 naira transfer.
 
 ### Added
 
+- Igbo number-word amounts: "puku" (thousand) or "nde" (million) followed by
+  one multiplier from 1 to 10, with or without dots below. Compound figures
+  ("puku iri abụọ") are still left to a provider.
 - The heuristic strips common leading filler/politeness phrases ("hey",
   "pls", "can you", "i want to", "kindly") before matching, so natural
   phrasing like "hey abeg send 20k to mama" or "can you send 20k to my mum"

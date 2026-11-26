@@ -6,7 +6,10 @@ body:
     id: input
     attributes:
       label: Exact input string
-      description: Copy-paste the user utterance you passed to `parse()`.
+      description: >-
+        Copy-paste the text you passed to `parse()`, replacing real names, phone
+        numbers and account numbers with made-up ones. Report security problems
+        privately (see SECURITY.md).
     validations:
       required: true
 

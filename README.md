@@ -10,6 +10,10 @@
 
 **Nigerian-language financial intent parser.**
 
+> **Alpha software.** `owo` can misread a message. Confirm the amount and
+> recipient with your user before moving money. See
+> [Safety and privacy](#safety-and-privacy).
+
 `owo` takes a free-form financial instruction in English, Pidgin, Yoruba, Hausa, or Igbo — and returns structured JSON that any payment backend can consume.
 
 ```python
@@ -18,20 +22,20 @@ from owo import parse
 result = parse("Send 20k to Mama")
 
 # OwoResult(intent='transfer', amount=20000.0, currency='NGN', recipient='Mama',
-#           field_confidence={'intent': 0.95, 'amount': 0.97, 'recipient': 0.9,
-#                             'language_detected': 0.8}, flags=[], ...)
+#           field_confidence={'intent': 0.95, 'recipient': 0.9,
+#                             'language_detected': 0.88, 'amount': 0.97}, flags=[], ...)
 ```
 
 ---
 
 ## Why owo?
 
-Nigerian fintech products that want a conversational layer have to solve the same hard problem: users don't speak in structured commands. They say *"abeg send 5k to Chidi"*, or *"jẹ kí n san owo ina mi"*, or *"biya wutar lantarki"*. Most NLU libraries weren't built for this. `owo` was.
+Nigerian fintech products that want a conversational layer have to solve the same hard problem: users don't speak in structured commands. They say *"abeg send 5k to Chidi"*, or *"Aika dubu goma zuwa ga Ahmad"*, or *"biya wutar lantarki"*. Most NLU libraries weren't built for this. `owo` was. Common transfers like the first two parse offline; a bill payment like the third needs a [provider](#configuration).
 
 It handles:
 
-- **Code-switching** — mid-sentence language mixing ("Send am 5k abeg, GTBank")
-- **Naija numerics** — `5k`, `2 bags`, `half a milli`
+- **Code-switching** — Pidgin and English in one sentence ("Abeg send 5k to Chidi, GTBank")
+- **Naija numerics** — `5k`, `half a milli`, `dubu goma`, `nde ise`
 - **Intent ambiguity** — flags underspecified fields rather than guessing
 - **Backend agnosticism** — plug in your own LLM provider
 
@@ -43,7 +47,7 @@ It handles:
 pip install owo-parse
 ```
 
-Requires Python 3.10+.
+Requires Python 3.11+.
 
 ---
 
@@ -53,20 +57,26 @@ Requires Python 3.10+.
 from owo import parse
 
 # English
-parse("Buy 2GB data for 08012345678 on MTN")
+parse("Send half a milli to Kemi")      # transfer, 500000.0, Kemi
 
 # Pidgin
-parse("Abeg top up my light, meter number 4512345678")
+parse("Abeg send 5k to Chidi, GTBank")  # transfer, 5000.0, Chidi, GTBank
 
 # Yoruba
-parse("Jẹ kí n san ₦5,000 fún DSTV mi")
+parse("Fi ₦5,000 ranṣẹ si Tunde")       # transfer, 5000.0, Tunde
 
 # Hausa
-parse("Aika dubu goma zuwa ga Ahmad")
+parse("Aika dubu goma zuwa ga Ahmad")   # transfer, 10000.0, Ahmad
 
 # Igbo
-parse("Zipụ ego nde ise nye Emeka")
+parse("Zipụ ego nde ise nye Emeka")     # transfer, 5000000.0, Emeka
+
+# Balance check
+parse("How much I get?")                # balance_check
 ```
+
+All of these run offline. Bill payments, airtime, data and crypto need a
+[provider](#configuration).
 
 Every call returns an `OwoResult`:
 
@@ -128,10 +138,12 @@ from owo.providers.anthropic import AnthropicProvider   # ANTHROPIC_API_KEY
 from owo.providers.openai import OpenAIProvider         # OPENAI_API_KEY
 from owo.providers.openrouter import OpenRouterProvider # OPENROUTER_API_KEY
 
-result = parse(
-    "Buy 2GB data for 08012345678 on MTN",
-    provider=AnthropicProvider(),  # or OpenAIProvider() / OpenRouterProvider()
-)
+provider = AnthropicProvider()  # or OpenAIProvider() / OpenRouterProvider()
+
+# These fall outside the offline rule set, so the provider handles them
+parse("Buy 2GB data for 08012345678 on MTN", provider=provider)
+parse("Abeg top up my light, meter number 4512345678", provider=provider)
+parse("Jẹ kí n san ₦5,000 fún DSTV mi", provider=provider)
 ```
 
 The heuristic always runs first — the provider is only called when the input falls
@@ -173,7 +185,7 @@ result = parse("Send money to Tunde")
 result.amount                       # None
 result.flags                        # ["missing_amount"]
 result.field_confidence             # {"intent": 0.95, "recipient": 0.9,
-                                    #  "language_detected": 0.8, "amount": 0.2}
+                                    #  "language_detected": 0.88, "amount": 0.2}
 result.confidence_for("amount")     # 0.2  ← the field to ask about
 result.confidence_for("recipient")  # 0.9  ← keep as-is
 result.min_confidence               # 0.2
@@ -183,20 +195,80 @@ Use `field_confidence` (or `min_confidence` for a single gate) together with
 `flags` to decide whether — and about *which field* — to ask the user for
 clarification before passing the result downstream.
 
+### When owo won't guess
+
+The offline rules accept a transfer only when the text after "to" (or its
+equivalent) looks like a name by itself. Anything else returns `unknown`, with
+no amount or recipient, so a provider can read the whole sentence:
+
+```python
+result = parse("send 5k to Chidi tomorrow")
+
+result.intent                      # "unknown"
+result.recipient                   # None
+result.flags                       # ["needs_llm_provider", "ambiguous_recipient"]
+result.raw["unparsed_recipient"]   # "Chidi tomorrow"
+```
+
+This covers extra clauses, account numbers, banks written without a comma and
+several words in lower case. Other reasons are `invalid_amount` (zero or not a
+finite number) and `input_too_long` (over 500 characters).
+
+These checks use word lists and capitalisation, so they can't catch every
+sentence. For example, extra capitalised words can be read as part of a name.
+
+Provider replies are validated too. A value of the wrong type, or an amount that
+isn't a positive number, is dropped and flagged `invalid_<field>`; a reply that
+isn't a JSON object, or has no valid intent, is flagged `bad_provider_output`.
+
+---
+
+## Safety and privacy
+
+### Before money moves
+
+`owo` turns text into fields. It does not check that a recipient exists, look up
+balances or enforce limits. Your application should:
+
+- show the amount, recipient and bank to the user and get explicit confirmation,
+  however high the confidence;
+- match the recipient to an account using records you trust;
+- apply its own amount limits, since `owo` sets no maximum;
+- stop and ask the user when a result carries any flag.
+
+`field_confidence` is not a measured accuracy. Offline scores are set by the
+rules; with a provider, they are whatever the model reports. A provider can also
+return a well-formed but wrong answer.
+
+### What leaves your system
+
+| You call                              | What is sent                                                  |
+| ------------------------------------- | ------------------------------------------------------------- |
+| `parse(text)`                         | Nothing. The offline rules make no network calls              |
+| `parse(text, provider=...)`           | The full text, to that provider, if the offline rules can't handle it |
+| `parse_audio(..., stt_provider=...)`  | The audio, to the speech-to-text service (OpenAI for `WhisperProvider`), then the transcript as above |
+
+Check each provider's data terms and the privacy law that applies to your users.
+
+`result.raw` can contain the user's text and the provider's reply, including
+names and account numbers. Redact it before logging or storing it.
+
 ---
 
 ## Supported intents
 
 
-| Intent          | Example                           |
-| --------------- | --------------------------------- |
-| `transfer`      | "Send 20k to Mama"                |
-| `bill_pay`      | "Pay my DSTV, smart card 1234567" |
-| `buy_airtime`   | "Recharge 500 naira on Airtel"    |
-| `buy_data`      | "Buy 5GB MTN data for my line"    |
-| `crypto_sell`   | "Sell 50 USDT"                    |
-| `balance_check` | "How much I get?"                 |
-| `unknown`       | Heuristic could not classify; use `flags` (`needs_llm_provider`) or an LLM provider |
+| Intent          | Example                           | Offline         |
+| --------------- | --------------------------------- | --------------- |
+| `transfer`      | "Send 20k to Mama"                | Common patterns |
+| `bill_pay`      | "Pay my DSTV, smart card 1234567" | Needs provider  |
+| `buy_airtime`   | "Recharge 500 naira on Airtel"    | Needs provider  |
+| `buy_data`      | "Buy 5GB MTN data for my line"    | Needs provider  |
+| `crypto_sell`   | "Sell 50 USDT"                    | Needs provider  |
+| `balance_check` | "How much I get?"                 | Common patterns |
+
+`parse()` returns `unknown` with the `needs_llm_provider` flag when the offline
+rules can't classify an input and no provider is passed.
 
 
 ---
@@ -213,7 +285,7 @@ clarification before passing the result downstream.
 | `ig`  | Igbo            |
 
 
-Mixed-language input (code-switching) is handled automatically — `owo` detects the dominant language and resolves cross-language entities.
+Offline, `owo` picks the language from the marker words in each sentence and handles mixed-language input that fits a supported pattern. Pass a provider for other code-switched input.
 
 ---
 
@@ -236,8 +308,9 @@ with open("voice_note.ogg", "rb") as f:
         stt_provider=WhisperProvider(),  # reads OPENAI_API_KEY from env
     )
 
-# result.intent  → "transfer"
-# result.amount  → 5000.0
+# For a voice note transcribed as "Abeg send 5k to Tunde":
+# result.intent    → "transfer"
+# result.amount    → 5000.0
 # result.recipient → "Tunde"
 ```
 
@@ -273,7 +346,7 @@ class GoogleSTTProvider(BaseSTTProvider):
 `owo` ships with a benchmark suite of curated test fixtures across all five languages:
 
 ```bash
-pip install owo-parse[eval]
+pip install 'owo-parse[eval]'
 python -m owo.eval
 ```
 
@@ -281,16 +354,15 @@ Results are printed per-language, per-intent, with a breakdown of field-level ac
 
 ---
 
-## Roadmap
+## Project status
 
+`owo` is alpha software, and behaviour or the result format can change between
+minor releases. Version 0.3.0, for example, replaced the single `confidence`
+score with `field_confidence`.
 
-| Version | Focus                                                 |
-| ------- | ----------------------------------------------------- |
-| `v0.1`  | Core intent + entity extraction (English + Pidgin)    |
-| `v0.2`  | Full multilingual support (Yoruba, Hausa, Igbo)       |
-| `v0.3`  | Confidence scores, ambiguity flags, graceful fallback |
-| `v1.0`  | Provider abstraction, eval suite, docs, OSS-ready     |
-
+[CHANGELOG.md](./CHANGELOG.md) lists released and unreleased changes. Suggest
+what should come next in the
+[issue tracker](https://github.com/LPMatrix/owo/issues).
 
 ---
 
@@ -298,7 +370,7 @@ Results are printed per-language, per-intent, with a breakdown of field-level ac
 
 Contributions welcome — especially test fixtures in Yoruba, Hausa, and Igbo, which are the hardest to source.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the fixture format and how to add a new language normalization map.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the fixture format and where the language word lists live.
 
 This project follows the [Contributor Covenant](./CODE_OF_CONDUCT.md). Security
 disclosures: [SECURITY.md](./SECURITY.md). Changes are summarized in

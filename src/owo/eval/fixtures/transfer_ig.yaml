@@ -30,3 +30,14 @@
     language_detected: ig
     flags: []
   notes: "zipu without the dot (common ASCII fallback for zipụ)."
+
+- id: transfer_ig_004
+  input: "Zipụ ego nde ise nye Emeka"
+  expected:
+    intent: transfer
+    amount: 5000000
+    currency: NGN
+    recipient: Emeka
+    language_detected: ig
+    flags: []
+  notes: "nde = million, multiplier follows the scale word (the README example)."

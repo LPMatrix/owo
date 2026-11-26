@@ -53,3 +53,14 @@
     flags:
       - missing_amount
   notes: "abeg + give with no amount."
+
+- id: transfer_pcm_typo_001
+  input: "abg trasfer 20k to mama pls"
+  expected:
+    intent: transfer
+    amount: 20000
+    currency: NGN
+    recipient: mama
+    language_detected: pcm
+    flags: []
+  notes: "SMS spelling, a misspelled verb after abeg, and trailing filler."
